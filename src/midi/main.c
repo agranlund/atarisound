@@ -26,6 +26,7 @@
 #include "mint/osbind.h"
 #include "mint/cookie.h"
 
+// TimerA or VBL playback
 #define ENABLE_TIMER_A
 
 // can't seem to get Midiws working realiably from interrupts in MiNT.
@@ -38,32 +39,32 @@
 
 // -----------------------------------------------------------------------
 jamPluginInfo info = {
-    JAM_INTERFACE_VERSION,			// interfaceVersion
-    0x0002,							// pluginVersion
-    "05.09.2024",					// date
-    ".MID",							// ext0
-    ".SMF",                         // ext1
-    " ",                            // ext2
-    " ",                      	 	// ext3
-    " ",                    	    // ext4
-    " ",                    	    // ext5
-    " ",                     	    // ext6
-    " ",                     	    // ext7
-    "MIDI",                         // pluginName
-    "Anders Granlund",              // authorName
-    "granlund23@yahoo.se",          // authorEmail
-    "www.happydaze.se",             // authorUrl
-    "",                             // authorComment
-      0,                            // isDsp
-     0x1F,                          // support
-      0,                            // datastart
-      1,                            // supportsNextSongHook
-      0,                            // supportsName
-      0,                            // supportsComposer
-      1,                            // supportsSongCount
-      1,                            // supportsPreselect
-      0,                            // supportsComment
-      1,                            // supportsFastram
+    JAM_INTERFACE_VERSION,      // interfaceVersion
+    0x0002,                     // pluginVersion
+    "2024.05.09",               // date
+    ".MID",                     // ext0
+    ".SMF",                     // ext1
+    " ",                        // ext2
+    " ",                        // ext3
+    " ",                        // ext4
+    " ",                        // ext5
+    " ",                        // ext6
+    " ",                        // ext7
+    "MIDI",                     // pluginName
+    "Anders Granlund",          // authorName
+    "granlund23@yahoo.se",      // authorEmail
+    "www.happydaze.se",         // authorUrl
+    "",                         // authorComment
+    0,                          // isDsp
+    0x1F,                       // support
+    0,                          // datastart
+    1,                          // supportsNextSongHook
+    0,                          // supportsName
+    0,                          // supportsComposer
+    1,                          // supportsSongCount
+    1,                          // supportsPreselect
+    0,                          // supportsComment
+    1,                          // supportsFastram
 };
 
 
@@ -76,9 +77,9 @@ bool midiTimerA;
 uint16 savBuf[23*2*12];
 
 // -----------------------------------------------------------------------
-#define BASE_ACIA			0xfffffc04UL
-#define BASE_RAVEN_MFP2		0xa0000a00UL
-#define C_RAVN				0x5241564EUL        // 'RAVN'
+#define BASE_ACIA           0xfffffc04UL
+#define BASE_RAVEN_MFP2     0xa0000a00UL
+#define C_RAVN              0x5241564EUL        // 'RAVN'
 
 
 void(*midiWrite)(uint8* buf, uint16 size);
@@ -145,15 +146,15 @@ static inline void midiWrite_bios(uint8* buf, uint16 size) {
 void(*midiEventHandler)(MD_midi_event*);
 void(*midiSysexHandler)(MD_sysex_event*);
 
-void midiEventHandler_acia(MD_midi_event *pev)		{ midiWrite_acia(pev->data, pev->size); }
+void midiEventHandler_acia(MD_midi_event *pev)      { midiWrite_acia(pev->data, pev->size); }
 void midiSysexHandler_acia(MD_sysex_event *pev)     { midiWrite_acia(pev->data, pev->size); }
-void midiEventHandler_raven(MD_midi_event *pev)		{ midiWrite_raven(pev->data, pev->size); }
-void midiSysexHandler_raven(MD_sysex_event *pev)	{ midiWrite_raven(pev->data, pev->size); }
-void midiEventHandler_vampire(MD_midi_event *pev)	{ midiWrite_vampire(pev->data, pev->size); }
-void midiSysexHandler_vampire(MD_sysex_event *pev)	{ midiWrite_vampire(pev->data, pev->size); }
-void midiEventHandler_bios(MD_midi_event *pev)		{ midiWrite_bios(pev->data, pev->size); }
-void midiSysexHandler_bios(MD_sysex_event *pev)		{ midiWrite_bios(pev->data, pev->size); }
-void midiEventHandler_null(MD_midi_event *pev)		{ }
+void midiEventHandler_raven(MD_midi_event *pev)     { midiWrite_raven(pev->data, pev->size); }
+void midiSysexHandler_raven(MD_sysex_event *pev)    { midiWrite_raven(pev->data, pev->size); }
+void midiEventHandler_vampire(MD_midi_event *pev)   { midiWrite_vampire(pev->data, pev->size); }
+void midiSysexHandler_vampire(MD_sysex_event *pev)  { midiWrite_vampire(pev->data, pev->size); }
+void midiEventHandler_bios(MD_midi_event *pev)      { midiWrite_bios(pev->data, pev->size); }
+void midiSysexHandler_bios(MD_sysex_event *pev)     { midiWrite_bios(pev->data, pev->size); }
+void midiEventHandler_null(MD_midi_event *pev)      { }
 void midiSysexHandler_null(MD_sysex_event *pev)     { }
 
 
@@ -218,13 +219,13 @@ bool jamOnPluginStart() {
     uint32 c_hades = 0;
     uint32 c_raven = 0;
     Getcookie(C__MCH, (long int*)&c_mch);
-    bool is_t40		= ((c_mch & 0xffff) == 0x4d34);
-    bool is_milan	= (Getcookie(C__MIL, (long int*)&c_milan) == C_FOUND);
-    bool is_hades	= (Getcookie(C_hade, (long int*)&c_hades) == C_FOUND);
-    bool is_raven	= (Getcookie(C_RAVN, (long int*)&c_raven) == C_FOUND);
-    bool is_clone	= (c_mch >= 0x00040000) || is_hades || is_t40 || is_milan;
-    bool is_aranym	= (c_mch == 0x00050000);
-    bool is_vampire	= (c_mch == 0x00060000);
+    bool is_t40        = ((c_mch & 0xffff) == 0x4d34);
+    bool is_milan    = (Getcookie(C__MIL, (long int*)&c_milan) == C_FOUND);
+    bool is_hades    = (Getcookie(C_hade, (long int*)&c_hades) == C_FOUND);
+    bool is_raven    = (Getcookie(C_RAVN, (long int*)&c_raven) == C_FOUND);
+    bool is_clone    = (c_mch >= 0x00040000) || is_hades || is_t40 || is_milan;
+    bool is_aranym    = (c_mch == 0x00050000);
+    bool is_vampire    = (c_mch == 0x00060000);
 
     if (!is_clone) {
         midiEventHandler = midiEventHandler_acia;
