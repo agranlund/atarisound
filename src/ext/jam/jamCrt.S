@@ -18,17 +18,17 @@
 //
 //-------------------------------------------------------------------------------------
 
-	.text
-	.extern _jamMessageHandler
-	.global _jamLibInited
-	.global _jamHookLog
-	.global _jamHookAlert
-	.global _jamHookNextSong
-	.global _jamTimerAVec
-	.global	_jamTimerAOld
-	.global _jamTimerALock
-	.global _jamTimerAFunc
-	.global _jamTimerATicks
+    .text
+    .extern _jamMessageHandler
+    .global _jamLibInited
+    .global _jamHookLog
+    .global _jamHookAlert
+    .global _jamHookNextSong
+    .global _jamTimerAVec
+    .global _jamTimerAOld
+    .global _jamTimerALock
+    .global _jamTimerAFunc
+    .global _jamTimerATicks
 
 //-------------------------------------------------------------------------
 // On entry (To the Plug-In):
@@ -51,13 +51,13 @@
 //-------------------------------------------------------------------------
 
 _jamEntry:
-	move.l	a0,-(sp)
-	movem.l	d0-d1/a1,-(sp)
-	jsr		_jamMessageHandler
-	move.l	d0,a0
-	movem.l	(sp)+,d0-d1/a1
-	addq.l	#4,sp
-	rts
+    move.l  a0,-(sp)
+    movem.l d0-d1/a1,-(sp)
+    jsr     _jamMessageHandler
+    move.l  d0,a0
+    movem.l (sp)+,d0-d1/a1
+    addq.l  #4,sp
+    rts
 
 
 //-------------------------------------------------------------------------
@@ -65,38 +65,38 @@ _jamEntry:
 // Log hook
 //
 //-------------------------------------------------------------------------
-	.global _jamCallHookLog
+    .global _jamCallHookLog
 _jamCallHookLog:
-	movem.l	d0-d7/a0-a6,-(sp)
-	move.l	60+4(sp),a0				// a0 = message
-	move.l	#0x786C6F67,d0			// d0 = 'xlog'
-	move.l	_jamHookLog,a1			// a1 = func
-	move.w	sr,d2
-	and.w	#0x2000,d2
-	bne.s	.log_hook_from_super
-	jsr		(a1)
-	movem.l	(sp)+,d0-d7/a0-a6
-	rts
+    movem.l d0-d7/a0-a6,-(sp)
+    move.l  60+4(sp),a0             // a0 = message
+    move.l  #0x786C6F67,d0          // d0 = 'xlog'
+    move.l  _jamHookLog,a1          // a1 = func
+    move.w  sr,d2
+    and.w   #0x2000,d2
+    bne.s   .log_hook_from_super
+    jsr     (a1)
+    movem.l (sp)+,d0-d7/a0-a6
+    rts
 .log_hook_from_super:
-	move.l	usp,a2
-	move.l	a2,-(sp)
-	move.l	sp,usp
-	sub.l	#64,sp					// 64 byte user stack for jam
-	jsr		(a1)					// call-in
-	add.l	#64,sp
-	move.l	(sp)+,a2
-	move.l	a2,usp
-	movem.l	(sp)+,d0-d7/a0-a6
-	rts
+    move.l  usp,a2
+    move.l  a2,-(sp)
+    move.l  sp,usp
+    sub.l   #64,sp                  // 64 byte user stack for jam
+    jsr     (a1)                    // call-in
+    add.l   #64,sp
+    move.l  (sp)+,a2
+    move.l  a2,usp
+    movem.l (sp)+,d0-d7/a0-a6
+    rts
 
 //-------------------------------------------------------------------------
 //
 // Alert hook
 //
 //-------------------------------------------------------------------------
-	.global _jamCallHookAlert
+    .global _jamCallHookAlert
 _jamCallHookAlert:
-	rts
+    rts
 
 
 //-------------------------------------------------------------------------
@@ -104,9 +104,9 @@ _jamCallHookAlert:
 // NextSong hook
 //
 //-------------------------------------------------------------------------
-	.global _jamCallHookNextSong
+    .global _jamCallHookNextSong
 _jamCallHookNextSong:
-	rts
+    rts
 
 
 //-------------------------------------------------------------------------
@@ -114,27 +114,27 @@ _jamCallHookNextSong:
 // TimerA
 //
 //-------------------------------------------------------------------------
-	dc.l	0x58425241				// XBRA
-	dc.l	0x4A414D50				// JAMA
-_jamTimerAOld:	dc.l	0
+    dc.l    0x58425241              // XBRA
+    dc.l    0x4A414D50              // JAMA
+_jamTimerAOld:    dc.l    0
 _jamTimerAVec:
-	addq.l	#1,_jamTimerATicks		// increase tick counter
-	tst.b	_jamTimerALock			// skip processing if locked
-	bne.s	.skipTimerA
-	move.b	#1,_jamTimerALock		// lock entry
-	movem.l	d0-d1/a0-a1,-(sp)		// save gcc regs
-	move.w	16(sp),d0				// get old sr
-	or.w	#0x2000,d0				// keep supervisor status
-	move.l	_jamTimerAFunc,a0		// get timer functions
-	move.b	#0xdf,0xfa0f.w			// clear in-service
-	move.w	d0,sr					// enable interrupts as they where
-	jsr		(a0)					// call timer function
-	movem.l	(sp)+,d0-d1/a0-a1		// restore gcc regs
-	clr.b	_jamTimerALock			// unlock entry
-	rte
+    addq.l  #1,_jamTimerATicks      // increase tick counter
+    tst.b   _jamTimerALock          // skip processing if locked
+    bne.s   .skipTimerA
+    move.b  #1,_jamTimerALock       // lock entry
+    movem.l d0-d1/a0-a1,-(sp)       // save gcc regs
+    move.w  16(sp),d0               // get old sr
+    or.w    #0x2000,d0              // keep supervisor status
+    move.l  _jamTimerAFunc,a0       // get timer functions
+    move.b  #0xdf,0xfa0f.w          // clear in-service
+    move.w  d0,sr                   // enable interrupts as they where
+    jsr     (a0)                    // call timer function
+    movem.l (sp)+,d0-d1/a0-a1       // restore gcc regs
+    clr.b   _jamTimerALock          // unlock entry
+    rte
 .skipTimerA:
-	move.b	#0xdf,0xfa0f.w			// clear timer-a in service
-	rte
+    move.b  #0xdf,0xfa0f.w          // clear timer-a in service
+    rte
 
 
 
@@ -142,12 +142,12 @@ _jamTimerAVec:
 //-------------------------------------------------------------------------
 // Variables in text section
 //-------------------------------------------------------------------------
-	.even
-_jamLibInited:		dc.l	0
-_jamHookLog:		dc.l	0
-_jamHookAlert:		dc.l	0
-_jamHookNextSong:	dc.l	0
-_jamTimerAFunc:		dc.l	0
-_jamTimerATicks:	dc.l	0
-_jamTimerALock:		dc.w	0
-					dc.w	0
+    .even
+_jamLibInited:      dc.l    0
+_jamHookLog:        dc.l    0
+_jamHookAlert:      dc.l    0
+_jamHookNextSong:   dc.l    0
+_jamTimerAFunc:     dc.l    0
+_jamTimerATicks:    dc.l    0
+_jamTimerALock:     dc.w    0
+                    dc.w    0
