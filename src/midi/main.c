@@ -28,6 +28,7 @@
 
 // TimerA or VBL playback
 #define ENABLE_TIMER_A
+#define TIMER_A_HZ      1000
 
 // can't seem to get Midiws working realiably from interrupts in MiNT.
 // would be nice with a 'MIDI' cookie with an input/output api
@@ -40,7 +41,7 @@
 // -----------------------------------------------------------------------
 jamPluginInfo info = {
     JAM_INTERFACE_VERSION,      // interfaceVersion
-    0x0002,                     // pluginVersion
+    0x0003,                     // pluginVersion
     "2024.05.09",               // date
     ".MID",                     // ext0
     ".SMF",                     // ext1
@@ -211,7 +212,7 @@ jamPluginInfo* jamOnPluginInfo() {
 
 bool jamOnPluginStart() {
     midi = 0;
-    midiTimerTargetHz = 1000;        // todo: adjust for cpu speed?
+    midiTimerTargetHz = TIMER_A_HZ; // todo: adjust for cpu speed?
     midiTimerA = true;
 
     uint32 c_mch = 0;
