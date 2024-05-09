@@ -1,0 +1,209 @@
+Archive member included to satisfy reference by file (symbol)
+
+../ext/libcmini/build/libcmini.a(close.o)
+                              md_midi.o (_close)
+../ext/libcmini/build/libcmini.a(free.o)
+                              md_midi.o (_free)
+../ext/libcmini/build/libcmini.a(lseek.o)
+                              md_midi.o (_lseek)
+../ext/libcmini/build/libcmini.a(malloc.o)
+                              md_midi.o (_malloc)
+../ext/libcmini/build/libcmini.a(open.o)
+                              md_midi.o (_open)
+../ext/libcmini/build/libcmini.a(read.o)
+                              md_midi.o (_read)
+../ext/libcmini/build/libcmini.a(stat.o)
+                              ../ext/libcmini/build/libcmini.a(open.o) (_stat)
+../ext/libcmini/build/libcmini.a(strcmp.o)
+                              md_midi.o (_strcmp)
+../ext/libcmini/build/libcmini.a(strlen.o)
+                              ../ext/libcmini/build/libcmini.a(open.o) (_strlen)
+../ext/libcmini/build/libcmini.a(bcopy.o)
+                              md_midi.o (_memcpy)
+../ext/libcmini/build/libcmini.a(memset.o)
+                              md_midi.o (_memset)
+
+Allocating common symbols
+Common symbol       size              file
+
+midiTimerRealHz     0x4               main.o
+midiEventHandler    0x4               main.o
+songInfo            0x4               ../JamLib.o
+midiMicrosPerTick   0x4               main.o
+midiWrite           0x4               main.o
+midiSysexHandler    0x4               main.o
+songData            0x4               ../JamLib.o
+midi                0x4               main.o
+midiTimerTargetHz   0x4               main.o
+errno               0x4               ../ext/libcmini/build/libcmini.a(close.o)
+
+There are no discarded input sections
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD ../JamCrt.o
+LOAD ../JamLib.o
+LOAD ../ext/lgcc.o
+LOAD main.o
+LOAD md_midi.o
+LOAD ../ext/libcmini/build/libcmini.a
+
+.text           0x000000e4     0x2638
+ CREATE_OBJECT_SYMBOLS
+ *(.text)
+ .text          0x000000e4       0xc4 ../JamCrt.o
+                0x000000fa                _jamCallHookLog
+                0x0000013a                _jamCallHookAlert
+                0x0000013c                _jamCallHookNextSong
+                0x00000146                _jamTimerAOld
+                0x0000014a                _jamTimerAVec
+                0x0000018e                _jamLibInited
+                0x00000192                _jamHookLog
+                0x00000196                _jamHookAlert
+                0x0000019a                _jamHookNextSong
+                0x0000019e                _jamTimerAFunc
+                0x000001a2                _jamTimerALock
+                0x000001a4                _jamTimerATicks
+ .text          0x000001a8      0x350 ../JamLib.o
+                0x000001a8                _jamInitLib
+                0x000001be                _jamSongFinished
+                0x000001d6                _jamLog
+                0x000001d8                _jamMessageHandler
+                0x000003f0                _jamHookTimerA
+                0x000004c6                _jamUnhookTimerA
+ .text          0x000004f8      0x100 ../ext/lgcc.o
+                0x000004f8                ___main
+                0x000004fa                ___mulsi3
+                0x0000051c                ___divsi3
+                0x00000546                ___udivsi3
+                0x000005a2                ___modsi3
+                0x000005cc                ___umodsi3
+ .text          0x000005f8      0x398 main.o
+                0x00000702                _midiEventHandler_bios
+                0x00000722                _midiSysexHandler_bios
+                0x00000742                _midiEventHandler_acia
+                0x00000762                _midiSysexHandler_acia
+                0x00000782                _midiEventHandler_null
+                0x00000784                _midiSysexHandler_null
+                0x00000786                _midiUpdate
+                0x0000087a                _jamOnPluginInfo
+                0x00000882                _jamOnPluginStart
+                0x000008aa                _jamOnPluginStop
+                0x000008b0                _jamOnLoad
+                0x000008fe                _jamOnInfo
+                0x0000092c                _jamOnPlay
+                0x0000093e                _jamOnStop
+                0x0000095e                _jamOnUpdate
+ .text          0x00000990     0x1254 md_midi.o
+                0x000009fe                _fd_fgets
+                0x00000b2c                _mf_tickClock
+                0x00000e14                _mt_parseEvent
+                0x00001882                _MD_Update
+                0x00001896                _MD_Silence
+                0x00001904                _MD_Pause
+                0x00001948                _MD_Restart
+                0x000019b6                _MD_isEOF
+                0x00001a36                _MD_OpenFile
+                0x00001b60                _MD_OpenBuffer
+                0x00001bc8                _MD_Close
+ .text          0x00001be4       0x30 ../ext/libcmini/build/libcmini.a(close.o)
+                0x00001be4                _close
+ .text          0x00001c14      0x110 ../ext/libcmini/build/libcmini.a(free.o)
+                0x00001c14                _free
+ .text          0x00001d24       0x28 ../ext/libcmini/build/libcmini.a(lseek.o)
+                0x00001d24                _lseek
+ .text          0x00001d4c      0x164 ../ext/libcmini/build/libcmini.a(malloc.o)
+                0x00001d4c                ___mallocChunkSize
+                0x00001d5e                _malloc
+ .text          0x00001eb0      0x398 ../ext/libcmini/build/libcmini.a(open.o)
+                0x00001eb0                _open
+ .text          0x00002248       0x3c ../ext/libcmini/build/libcmini.a(read.o)
+                0x00002248                _read
+ .text          0x00002284      0x1dc ../ext/libcmini/build/libcmini.a(stat.o)
+                0x00002284                _stat
+ .text          0x00002460       0x38 ../ext/libcmini/build/libcmini.a(strcmp.o)
+                0x00002460                _strcmp
+ .text          0x00002498       0x14 ../ext/libcmini/build/libcmini.a(strlen.o)
+                0x00002498                _strlen
+ .text          0x000024ac      0x1c8 ../ext/libcmini/build/libcmini.a(bcopy.o)
+                0x000024ac                _memcpy
+                0x000024ac                _memmove
+                0x000024b6                ___bcopy
+                0x000024b6                _bcopy
+                0x000024b6                __bcopy
+ .text          0x00002674       0xa8 ../ext/libcmini/build/libcmini.a(memset.o)
+                0x00002674                _memset
+                0x0000271c                        etext = .
+                0x0000271c                        _etext = .
+                0x0000271c                        __etext = .
+
+.data           0x0000271c      0x2f0
+ *(.data)
+ .data          0x0000271c        0x0 ../JamCrt.o
+ .data          0x0000271c        0x0 ../JamLib.o
+ .data          0x0000271c        0x0 ../ext/lgcc.o
+ .data          0x0000271c      0x2d8 main.o
+                0x0000271c                _info
+ .data          0x000029f4        0x0 md_midi.o
+ .data          0x000029f4        0x0 ../ext/libcmini/build/libcmini.a(close.o)
+ .data          0x000029f4       0x10 ../ext/libcmini/build/libcmini.a(free.o)
+                0x000029f4                __mchunk_free_list
+ .data          0x00002a04        0x0 ../ext/libcmini/build/libcmini.a(lseek.o)
+ .data          0x00002a04        0x8 ../ext/libcmini/build/libcmini.a(malloc.o)
+ .data          0x00002a0c        0x0 ../ext/libcmini/build/libcmini.a(open.o)
+ .data          0x00002a0c        0x0 ../ext/libcmini/build/libcmini.a(read.o)
+ .data          0x00002a0c        0x0 ../ext/libcmini/build/libcmini.a(stat.o)
+ .data          0x00002a0c        0x0 ../ext/libcmini/build/libcmini.a(strcmp.o)
+ .data          0x00002a0c        0x0 ../ext/libcmini/build/libcmini.a(strlen.o)
+ .data          0x00002a0c        0x0 ../ext/libcmini/build/libcmini.a(bcopy.o)
+ .data          0x00002a0c        0x0 ../ext/libcmini/build/libcmini.a(memset.o)
+                0x00002a0c                        _edata = .
+                0x00002a0c                        __edata = .
+
+.bss            0x00002a0c      0x1b0
+                0x00002a0c                        __bss_start = .
+ *(.bss)
+ .bss           0x00002a0c        0x0 ../JamCrt.o
+ .bss           0x00002a0c       0x80 ../JamLib.o
+ .bss           0x00002a8c        0x0 ../ext/lgcc.o
+ .bss           0x00002a8c        0x0 main.o
+ .bss           0x00002a8c      0x108 md_midi.o
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(close.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(free.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(lseek.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(malloc.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(open.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(read.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(stat.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(strcmp.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(strlen.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(bcopy.o)
+ .bss           0x00002b94        0x0 ../ext/libcmini/build/libcmini.a(memset.o)
+ *(COMMON)
+ COMMON         0x00002b94        0x8 ../JamLib.o
+                0x00002b94                _songInfo
+                0x00002b98                _songData
+ COMMON         0x00002b9c       0x1c main.o
+                0x00002b9c                _midiTimerRealHz
+                0x00002ba0                _midiEventHandler
+                0x00002ba4                _midiMicrosPerTick
+                0x00002ba8                _midiWrite
+                0x00002bac                _midiSysexHandler
+                0x00002bb0                _midi
+                0x00002bb4                _midiTimerTargetHz
+ COMMON         0x00002bb8        0x4 ../ext/libcmini/build/libcmini.a(close.o)
+                0x00002bb8                _errno
+                0x00002bbc                        _end = .
+                0x00002bbc                        __end = .
+
+/DISCARD/
+ *(.comment)
+ *(.debug*)
+ *(.note*)
+ *(.gnu.attributes)
+OUTPUT(../..test.jam a.out-mintprg)

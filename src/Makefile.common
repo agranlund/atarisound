@@ -1,0 +1,53 @@
+TARGET_CC	= m68k-atari-mint-gcc
+NATIVE_CC	= gcc
+
+OUTDIR			= ../..
+EXE_STRIPX		= $(ROOTDIR)ext/stripx/stripx
+LIBCMINI_DIR	= $(ROOTDIR)ext/libcmini
+LIBCMINI_INC	= -I$(LIBCMINI_DIR)/include
+LIBCMINI_LIB	= -L$(LIBCMINI_DIR)/build
+LIBCMINI_CRT	= $(LIBCMINI_DIR)/build/minicrt0.o
+LIBCMINI_CFL	= -ffast-math -nostdlib 
+LIBCMINI_LFL	= -nodefaultlibs -nostdlib -nostartfiles -lcmini
+LGCC_OBJ		= $(ROOTDIR)ext/lgcc.o
+JAM_OBJS		= $(ROOTDIR)ext/jam/JamCrt.o $(ROOTDIR)ext/jam/JamLib.o
+
+CC				= $(TARGET_CC)
+STRIP 			= $(EXE_STRIPX) -v -f
+
+
+
+.PHONY: common common_clean
+
+common: $(EXE_STRIPX) $(LIBCMINI_CRT) $(LGCC_OBJ) $(JAM_OBJS)
+
+common_clean:
+	cd $(LIBCMINI_DIR) && make clean
+	rm -f $(EXE_STRIPX)
+	rm -f $(LGCC_OBJ)
+	rm -f $(JAM_OBJS)
+	rm -f *.o
+
+$(EXE_STRIPX) : $(EXE_STRIPX).c
+	$(NATIVE_CC) $(EXE_STRIPX).c -o $(EXE_STRIPX)
+
+$(LIBCMINI_CRT):
+	cd $(LIBCMINI_DIR) && make
+
+$(LGCC_OBJ) : $(LGCC_OBJ:.o=.S)
+	$(CC) -std=c99 -fomit-frame-pointer -fno-exceptions -Wall -m68000 -O0 -c $< -o $@
+
+$(ROOTDIR)ext/jam/JamCrt.o : $(ROOTDIR)ext/jam/JamCrt.S
+	$(CC) $(INCLUDE) $(CPUFLAGS) $(SFLAGS) -c $< -o $@
+
+$(ROOTDIR)ext/jam/JamLib.o : $(ROOTDIR)ext/jam/JamLib.c
+	$(CC) $(INCLUDE) $(CPUFLAGS) $(CFLAGS) -c $< -o $@
+
+%.o : %.S
+	$(CC) $(INCLUDE) $(CPUFLAGS) $(SFLAGS) -c $< -o $@
+
+%.o : %.c
+	$(CC) $(INCLUDE) $(CPUFLAGS) $(CFLAGS) -c $< -o $@
+
+
+
