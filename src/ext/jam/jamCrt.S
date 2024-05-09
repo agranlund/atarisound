@@ -115,7 +115,7 @@ _jamCallHookNextSong:
 //
 //-------------------------------------------------------------------------
 	dc.l	0x58425241				// XBRA
-	dc.l	0x4A414D50				// JAMP
+	dc.l	0x4A414D50				// JAMA
 _jamTimerAOld:	dc.l	0
 _jamTimerAVec:
 	addq.l	#1,_jamTimerATicks		// increase tick counter
@@ -137,6 +137,8 @@ _jamTimerAVec:
 	rte
 
 
+
+
 //-------------------------------------------------------------------------
 // Variables in text section
 //-------------------------------------------------------------------------
@@ -146,5 +148,6 @@ _jamHookLog:		dc.l	0
 _jamHookAlert:		dc.l	0
 _jamHookNextSong:	dc.l	0
 _jamTimerAFunc:		dc.l	0
-_jamTimerALock:		dc.w	0
 _jamTimerATicks:	dc.l	0
+_jamTimerALock:		dc.w	0
+					dc.w	0

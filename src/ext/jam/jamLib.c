@@ -36,14 +36,24 @@ extern void jamCallHookNextSong();
 extern void jamCallHookLog(char* msg);
 extern void jamCallHookAlert(char* msg);
 
+void (*jamVblFunc)(void);
+extern uint32 jamTimerAOld;
+extern void jamTimerAVec();
+void (*jamTimerAFunc)(void);
+extern int16 jamTimerALock;
+
 //-------------------------------------------------------------
 // Initialization
 //-------------------------------------------------------------
 void jamInitLib()
 {
-	jamLibInited = 1;
 	songData = 0;
 	songInfo = 0;
+	jamVblFunc = null;
+	jamTimerAFunc = null;
+	jamTimerALock = 0;
+	jamTimerAOld = 0;
+	jamLibInited = 1;
 }
 
 //-------------------------------------------------------------
@@ -187,11 +197,6 @@ uint32 jamMessageHandler(int32 param, int32 msg, void* data2, void* data1)
 //-------------------------------------------------------------
 
 
-extern uint32 jamTimerAOld;
-extern void jamTimerAVec();
-void (*jamTimerAFunc)(void);
-extern int16 jamTimerALock;
-
 static int mfpParamsFromHz(int32 hz, uint16* ctrl, uint16* data) {
 	const uint32 dividers[7] = {4, 10, 16, 50, 64, 100, 200};
 	const uint32 baseclk = 2457600;
@@ -220,10 +225,11 @@ static int mfpParamsFromHz(int32 hz, uint16* ctrl, uint16* data) {
 
 uint32 jamHookTimerA(void(*func)(void), uint32 hz)
 {
+	jamUnhookTimerA();
 	jamTimerALock = 1;
 	Jdisint(MFP_TIMERA);
 	// todo: save all relevant mfp regs?
-	jamTimerAOld = (uint32)Setexc(0x114>>2, -1);
+	jamTimerAOld = (uint32)Setexc(0x134>>2, -1);
 	jamTimerAFunc = func;
 	uint16 ctrl, data;
 	uint32 real_hz = mfpParamsFromHz(hz, &ctrl, &data);
@@ -235,9 +241,71 @@ uint32 jamHookTimerA(void(*func)(void), uint32 hz)
 
 void jamUnhookTimerA()
 {
-	jamTimerALock = 1;
-	Jdisint(MFP_TIMERA);
-	jamTimerAFunc = 0;
-	// todo: restore timera?
+	if (jamTimerAFunc != null) {
+		jamTimerALock = 1;
+		Jdisint(MFP_TIMERA);
+		(void)Setexc(0x134>>2, jamTimerAOld);
+		jamTimerAFunc = 0;
+		jamTimerAOld = 0;
+	}
 }
 
+static uint16 disableIrq() {
+	uint16 sr;
+    __asm__ __volatile__(
+    	" move.w	sr,%0\n\t"
+		" or.w		#0x0700,sr\n\t"
+    : "=d"(sr) : : "cc" );
+	return sr;
+}
+
+static void restoreIrq(uint16 sr) {
+    __asm__ __volatile__(
+		" move.w	sr,d0\n\t"
+    : : "d"(sr) : "cc" );
+}
+
+
+void jamUnhookVbl() {
+	if (jamVblFunc == null)
+		return;
+	uint16 sr = disableIrq();
+	volatile uint32* vblq = *((volatile uint32**)0x456);
+	uint32  vblc = *((volatile uint32*)0x454);
+	for (int i=0; i<vblc; i++) {
+		if (vblq[i] == (uint32)jamVblFunc) {
+			vblq[i] = 0;
+			break;
+		}
+	}
+	jamVblFunc = null;
+	restoreIrq(sr);
+}
+
+
+void jamHookVbl(void(*func)(void))
+{
+	jamUnhookVbl();
+	uint16 sr = disableIrq();
+
+	int16 idx = -1;
+	volatile uint32* vblq = *((volatile uint32**)0x456);
+	uint32  vblc = *((volatile uint32*)0x454);
+	for (int i=0; (i<vblc) && (idx < 0); i++) {
+		if (vblq[i] == 0) {
+			idx = i;
+			break;
+		}
+	}
+
+	// todo: resize vbl queue
+	if (idx < 0) {
+	}
+
+	if (idx >= 0) {
+		vblq[idx] = (uint32)func;
+		jamVblFunc = func;
+	}
+
+	restoreIrq(sr);
+}
