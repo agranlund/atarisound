@@ -1,7 +1,7 @@
-TARGET_CC	= m68k-atari-mint-gcc
-NATIVE_CC	= gcc
-
-OUTDIR			= ../..
+# ------------------------------------------------------
+TARGET_CC		= m68k-atari-mint-gcc
+NATIVE_CC		= gcc
+OUTDIR			= ../../../bin/jamplugins
 EXE_STRIPX		= $(ROOTDIR)ext/stripx/stripx
 LIBCMINI_DIR	= $(ROOTDIR)ext/libcmini
 LIBCMINI_INC	= -I$(LIBCMINI_DIR)/include
@@ -11,22 +11,12 @@ LIBCMINI_CFL	= -ffast-math -nostdlib
 LIBCMINI_LFL	= -nodefaultlibs -nostdlib -nostartfiles -lcmini
 LGCC_OBJ		= $(ROOTDIR)ext/lgcc.o
 JAM_OBJS		= $(ROOTDIR)ext/jam/JamCrt.o $(ROOTDIR)ext/jam/JamLib.o
-
 CC				= $(TARGET_CC)
 STRIP 			= $(EXE_STRIPX) -v -f
 
 
-
-.PHONY: common common_clean
-
+# ------------------------------------------------------
 common: $(EXE_STRIPX) $(LIBCMINI_CRT) $(LGCC_OBJ) $(JAM_OBJS)
-
-common_clean:
-	cd $(LIBCMINI_DIR) && make clean
-	rm -f $(EXE_STRIPX)
-	rm -f $(LGCC_OBJ)
-	rm -f $(JAM_OBJS)
-	rm -f *.o
 
 $(EXE_STRIPX) : $(EXE_STRIPX).c
 	$(NATIVE_CC) $(EXE_STRIPX).c -o $(EXE_STRIPX)
@@ -48,6 +38,4 @@ $(ROOTDIR)ext/jam/JamLib.o : $(ROOTDIR)ext/jam/JamLib.c
 
 %.o : %.c
 	$(CC) $(INCLUDE) $(CPUFLAGS) $(CFLAGS) -c $< -o $@
-
-
 

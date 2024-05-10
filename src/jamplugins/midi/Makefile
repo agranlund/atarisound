@@ -1,7 +1,7 @@
 
 OUTBIN  = $(OUTDIR)/midi.jam
 
-ROOTDIR = ../
+ROOTDIR = ../../
 
 SYMFLAGS = -Wl,--traditional-format
 
@@ -44,8 +44,9 @@ $(OUTBIN): common Makefile $(OBJS)
 clean:
 	rm -f *.o
 	rm -f mapfile
-	rm -f $(OUTBIN)
+#	rm -f $(OUTBIN)
 
 
 include ../Makefile.common
+
 
