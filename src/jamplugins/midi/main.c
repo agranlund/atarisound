@@ -97,6 +97,14 @@ static inline void midiWrite_acia(uint8* buf, uint16 size) {
 
 static inline void midiWrite_bios(uint8* buf, uint16 size) {
 #if ENABLE_BIOS_MIDI
+
+#if 1
+    // safe in both TOS and MiNT
+    uint8* end = &buf[size];
+    while (buf != end) {
+        biosMidiOut((3<<16) | *buf++);
+    }
+#else
     // Hitchhikers Guide to the Bios.
     //
     // It is possible to do a BIOS call from an interrupt handler.
@@ -111,39 +119,33 @@ static inline void midiWrite_bios(uint8* buf, uint16 size) {
     // Only ONE interrupt handler may do this. That is, two interrupt handlers
     // cannot nest and do BIOS calls in this manner.
     //
-    #define savptr *((volatile uint32*)0x4a2)
-    #define savamt (23 * 2)
+
+    //
+    // !! NOTE: This does not work under MiNT. Its bconout implementation does a
+    // of things not suitable for being called from interrupts.
+    //
+
     if (size < 1)
         return;
 
     uint16 sr = jamDisableInterrupts();
-
+    #define savptr *((volatile uint32*)0x4a2)
+    #define savamt (23 * 2)
     #if 0
         savptr -= savamt;
     #else    
         uint32 oldsav = savptr;
         savptr = (uint32)&savBuf[savamt*3];
     #endif
-
-#if 0
-    // we can't use Midiws/Bconout from interrupts when running under MiNT
     Midiws(size - 1, buf);
-#else    
-    uint8* end = &buf[size];
-    while (buf != end) {
-        biosMidiOut((3<<16) | *buf++);
-    }
-#endif
-
     #if 0
         savptr += savamt;
     #else
         savptr = oldsav;
     #endif
-
     jamRestoreInterrupts(sr);
-
 #endif
+#endif // ENABLE_BIOS_MIDI
 }
 
 
