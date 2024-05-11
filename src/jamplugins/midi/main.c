@@ -27,14 +27,14 @@
 #include "mint/cookie.h"
 
 // TimerA or VBL playback
-#define ENABLE_TIMER_A
-#define TIMER_A_HZ      1000
+#define ENABLE_TIMER_A      1
+#define TIMER_A_HZ          1000
 
-// can't seem to get Midiws working realiably from interrupts in MiNT.
-// would be nice with a 'MIDI' cookie with an input/output api
-// that each clone system, or PCI/ISA/etc device drivers, could implement.
-// todo: use ADI when/if that system is done and has midi routing.
-//#define ENABLE_BIOS_MIDI
+// Enable direct hardware access for known machines
+#define ENABLE_DIRECT_MIDI  1
+
+// Enable midi-out through bios
+#define ENABLE_BIOS_MIDI    1
 
 
 
@@ -69,8 +69,13 @@ jamPluginInfo info = {
 };
 
 
+
 // -----------------------------------------------------------------------
 MD_MIDIFile* midi;
+
+void (*midiWrite)(uint8* buf, uint16 size);
+int32 (*biosMidiOut)(uint32 d);
+
 uint32 midiTimerTargetHz;
 uint32 midiTimerRealHz;
 uint32 midiMicrosPerTick;
@@ -78,43 +83,20 @@ bool midiTimerA;
 uint16 savBuf[23*2*12];
 
 // -----------------------------------------------------------------------
-#define BASE_ACIA           0xfffffc04UL
-#define BASE_RAVEN_MFP2     0xa0000a00UL
-#define C_RAVN              0x5241564EUL        // 'RAVN'
-
-
-void(*midiWrite)(uint8* buf, uint16 size);
-
 static inline void midiWrite_acia(uint8* buf, uint16 size) {
     for (short i=0; i<size; i++) {
         while(1) {
-            volatile uint8 status = *((volatile uint8*)(BASE_ACIA));
+            volatile uint8 status = *((volatile uint8*)(0xfffffc04UL));
             if (status & 2) {
-                *((volatile uint8*)(BASE_ACIA+2)) = *buf++;
+                *((volatile uint8*)(0xfffffc06UL)) = *buf++;
                 break;
             }
         }
     }
 }
-
-static inline void midiWrite_raven(uint8* buf, uint16 size) {
-    for (short i=0; i<size; i++) {
-        while(1) {
-            if (*((volatile uint8*)(BASE_RAVEN_MFP2 + 45)) & 0x80) {        // mfp2->tsr
-                *((volatile uint8*)(BASE_RAVEN_MFP2 + 47)) = *buf++;        // mfp2->udr
-                break;
-            }
-        }
-    }
-}
-
-static inline void midiWrite_vampire(uint8* buf, uint16 size) {
-    // todo...
-}
-
 
 static inline void midiWrite_bios(uint8* buf, uint16 size) {
-#ifdef ENABLE_BIOS_MIDI
+#if ENABLE_BIOS_MIDI
     // Hitchhikers Guide to the Bios.
     //
     // It is possible to do a BIOS call from an interrupt handler.
@@ -133,12 +115,34 @@ static inline void midiWrite_bios(uint8* buf, uint16 size) {
     #define savamt (23 * 2)
     if (size < 1)
         return;
-    //savptr -= savamt;
-    uint32 oldsav = savptr;
-    savptr = (uint32)&savBuf[23*2*3];
+
+    uint16 sr = jamDisableInterrupts();
+
+    #if 0
+        savptr -= savamt;
+    #else    
+        uint32 oldsav = savptr;
+        savptr = (uint32)&savBuf[savamt*3];
+    #endif
+
+#if 0
+    // we can't use Midiws/Bconout from interrupts when running under MiNT
     Midiws(size - 1, buf);
-    savptr = oldsav;
-    //savptr += savamt;
+#else    
+    uint8* end = &buf[size];
+    while (buf != end) {
+        biosMidiOut((3<<16) | *buf++);
+    }
+#endif
+
+    #if 0
+        savptr += savamt;
+    #else
+        savptr = oldsav;
+    #endif
+
+    jamRestoreInterrupts(sr);
+
 #endif
 }
 
@@ -149,10 +153,6 @@ void(*midiSysexHandler)(MD_sysex_event*);
 
 void midiEventHandler_acia(MD_midi_event *pev)      { midiWrite_acia(pev->data, pev->size); }
 void midiSysexHandler_acia(MD_sysex_event *pev)     { midiWrite_acia(pev->data, pev->size); }
-void midiEventHandler_raven(MD_midi_event *pev)     { midiWrite_raven(pev->data, pev->size); }
-void midiSysexHandler_raven(MD_sysex_event *pev)    { midiWrite_raven(pev->data, pev->size); }
-void midiEventHandler_vampire(MD_midi_event *pev)   { midiWrite_vampire(pev->data, pev->size); }
-void midiSysexHandler_vampire(MD_sysex_event *pev)  { midiWrite_vampire(pev->data, pev->size); }
 void midiEventHandler_bios(MD_midi_event *pev)      { midiWrite_bios(pev->data, pev->size); }
 void midiSysexHandler_bios(MD_sysex_event *pev)     { midiWrite_bios(pev->data, pev->size); }
 void midiEventHandler_null(MD_midi_event *pev)      { }
@@ -169,12 +169,8 @@ void midiUpdate_timerA() {
 
 void midiUpdate_vbl() {
     if (midi) {
-        uint16 sr;
-        __asm__ volatile ( "    move.w sr,%0" : "=d"(sr) : : "cc");
-        __asm__ volatile ( "    or.w #0x0700,sr" : : : "cc");
         uint32 timerCTicks = *((volatile uint32*)0x4ba);
         MD_Update(midi, timerCTicks * midiMicrosPerTick);
-        __asm__ volatile ( "    move.w %0,sr" : : "d"(sr) : "cc");
     }
 }
 
@@ -212,44 +208,27 @@ jamPluginInfo* jamOnPluginInfo() {
 
 bool jamOnPluginStart() {
     midi = 0;
-    midiTimerTargetHz = TIMER_A_HZ; // todo: adjust for cpu speed?
-    midiTimerA = true;
+    biosMidiOut = (int32(*)(uint32)) *(volatile uint32*)(0x57e + (3 * 4));
 
+    // todo: adjust for cpu speed?
+    midiTimerA = (bool)ENABLE_TIMER_A;
+    midiTimerTargetHz = TIMER_A_HZ;
+
+    // machine dependent output routine
     uint32 c_mch = 0;
-    uint32 c_milan = 0;
-    uint32 c_hades = 0;
-    uint32 c_raven = 0;
     Getcookie(C__MCH, (long int*)&c_mch);
-    bool is_t40        = ((c_mch & 0xffff) == 0x4d34);
-    bool is_milan    = (Getcookie(C__MIL, (long int*)&c_milan) == C_FOUND);
-    bool is_hades    = (Getcookie(C_hade, (long int*)&c_hades) == C_FOUND);
-    bool is_raven    = (Getcookie(C_RAVN, (long int*)&c_raven) == C_FOUND);
-    bool is_clone    = (c_mch >= 0x00040000) || is_hades || is_t40 || is_milan;
-    bool is_aranym    = (c_mch == 0x00050000);
-    bool is_vampire    = (c_mch == 0x00060000);
-
-    if (!is_clone) {
+    bool is_t40 = ((c_mch & 0xffff) == 0x4d34);
+    bool is_clone = (c_mch >= 0x00040000) || is_t40;
+    if (!is_clone && ENABLE_DIRECT_MIDI) {
         midiEventHandler = midiEventHandler_acia;
         midiSysexHandler = midiSysexHandler_acia;
-    }
-    else if (is_raven) {
-        midiEventHandler = midiEventHandler_raven;
-        midiSysexHandler = midiSysexHandler_raven;
-    }
-    else if (is_vampire) {
-        midiEventHandler = midiEventHandler_vampire;
-        midiSysexHandler = midiSysexHandler_vampire;
     }
     else {
         midiEventHandler = midiEventHandler_bios;
         midiSysexHandler = midiSysexHandler_bios;
+        midiTimerA = false;
     }
 
-#ifdef ENABLE_TIMER_A
-    midiTimerA = (midiEventHandler == midiEventHandler_bios) ? false : true;
-#else
-    midiTimerA = false;
-#endif
     return true;
 }
 

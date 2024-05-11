@@ -225,6 +225,7 @@ static int mfpParamsFromHz(int32 hz, uint16* ctrl, uint16* data) {
 
 uint32 jamHookTimerA(void(*func)(void), uint32 hz)
 {
+    uint16 sr = jamDisableInterrupts();
     jamUnhookTimerA();
     jamTimerALock = 1;
     Jdisint(MFP_TIMERA);
@@ -236,11 +237,13 @@ uint32 jamHookTimerA(void(*func)(void), uint32 hz)
     Xbtimer(XB_TIMERA, ctrl, data, jamTimerAVec);
     Jenabint(MFP_TIMERA);
     jamTimerALock = 0;
+    jamRestoreInterrupts(sr);
     return real_hz;
 }
 
 void jamUnhookTimerA()
 {
+    uint16 sr = jamDisableInterrupts();
     if (jamTimerAFunc != null) {
         jamTimerALock = 1;
         Jdisint(MFP_TIMERA);
@@ -248,45 +251,30 @@ void jamUnhookTimerA()
         jamTimerAFunc = 0;
         jamTimerAOld = 0;
     }
+    jamRestoreInterrupts(sr);
 }
-
-static uint16 disableIrq() {
-    uint16 sr;
-    __asm__ __volatile__(
-        " move.w    sr,%0\n\t"
-        " or.w        #0x0700,sr\n\t"
-    : "=d"(sr) : : "cc" );
-    return sr;
-}
-
-static void restoreIrq(uint16 sr) {
-    __asm__ __volatile__(
-        " move.w    sr,d0\n\t"
-    : : "d"(sr) : "cc" );
-}
-
 
 void jamUnhookVbl() {
-    if (jamVblFunc == null)
-        return;
-    uint16 sr = disableIrq();
-    volatile uint32* vblq = *((volatile uint32**)0x456);
-    uint32  vblc = *((volatile uint32*)0x454);
-    for (int i=0; i<vblc; i++) {
-        if (vblq[i] == (uint32)jamVblFunc) {
-            vblq[i] = 0;
-            break;
+    uint16 sr = jamDisableInterrupts();
+    if (jamVblFunc != null) {
+        volatile uint32* vblq = *((volatile uint32**)0x456);
+        uint32  vblc = *((volatile uint32*)0x454);
+        for (int i=0; i<vblc; i++) {
+            if (vblq[i] == (uint32)jamVblFunc) {
+                vblq[i] = 0;
+                break;
+            }
         }
+        jamVblFunc = null;
     }
-    jamVblFunc = null;
-    restoreIrq(sr);
+    jamRestoreInterrupts(sr);
 }
 
 
 void jamHookVbl(void(*func)(void))
 {
     jamUnhookVbl();
-    uint16 sr = disableIrq();
+    uint16 sr = jamDisableInterrupts();
 
     int16 idx = -1;
     volatile uint32* vblq = *((volatile uint32**)0x456);
@@ -297,15 +285,12 @@ void jamHookVbl(void(*func)(void))
             break;
         }
     }
-
-    // todo: resize vbl queue
     if (idx < 0) {
+        // todo: resize vbl queue
     }
-
     if (idx >= 0) {
         vblq[idx] = (uint32)func;
         jamVblFunc = func;
     }
-
-    restoreIrq(sr);
+    jamRestoreInterrupts(sr);
 }
