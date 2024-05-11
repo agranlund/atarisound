@@ -41,7 +41,7 @@
 // -----------------------------------------------------------------------
 jamPluginInfo info = {
     JAM_INTERFACE_VERSION,      // interfaceVersion
-    0x0003,                     // pluginVersion
+    0x0004,                     // pluginVersion
     "2024.05.09",               // date
     ".MID",                     // ext0
     ".SMF",                     // ext1
@@ -102,7 +102,8 @@ static inline void midiWrite_bios(uint8* buf, uint16 size) {
     // safe in both TOS and MiNT
     uint8* end = &buf[size];
     while (buf != end) {
-        biosMidiOut((3<<16) | *buf++);
+        int16 c = (int8)*buf++;
+        biosMidiOut((3<<16) | c);
     }
 #else
     // Hitchhikers Guide to the Bios.
