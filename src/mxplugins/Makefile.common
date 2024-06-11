@@ -1,0 +1,57 @@
+# ------------------------------------------------------
+CC      		= m68k-atari-mint-gcc
+STRIP	        = m68k-atari-mint-strip -s
+FLAGS	        = m68k-atari-mint-flags -S
+LIBCMINI_DIR	= $(ROOTDIR)ext/libcmini
+GCC_OBJS		= $(ROOTDIR)ext/lgcc.o
+MXP_OBJS		= $(ROOTDIR)mxplugins/mxplay_crt0.o $(ROOTDIR)mxplugins/mxplay_utils.o
+
+CPUFLAGS 	    = -m68000
+OUTDIR			= ../../../bin/mxplugins
+OUTBIN          = $(OUTDIR)/$(BIN)
+
+SFLAGS = $(OPT) $(CPUFLAGS)
+
+CFLAGS = $(OPTS) $(CPUFLAGS) \
+    -I$(LIBCMINI_DIR)/include \
+    -std=c99 -fomit-frame-pointer -fno-exceptions -ffast-math \
+	-Wall -Wno-multichar -Wno-unused-but-set-variable -Wno-unused-variable
+
+LFLAGS = \
+    -L$(LIBCMINI_DIR)/build \
+    -nodefaultlibs -nostdlib -nostartfiles -lcmini \
+	-Wl,-Map,mapfile
+
+LINKOBJS        = $(MXP_OBJS) $(GCC_OBJS) $(OBJS)
+
+# ------------------------------------------------------
+
+.PHONY: clean all
+
+all: $(OUTBIN)
+
+$(OUTBIN) : $(BIN)
+	cp $(BIN) $(OUTBIN)
+
+$(BIN): common Makefile $(LINKOBJS)
+	$(CC) $(CFLAGS) $(LINKOBJS) $(LFLAGS) -o $(BIN)
+	$(STRIP) $(BIN)
+	$(FLAGS) $(BIN)
+
+clean:
+	rm -f $(BIN)
+	rm -f $(LINKOBJS)
+	rm -f mapfile
+
+
+# ------------------------------------------------------
+
+common:
+	cd $(LIBCMINI_DIR) && make
+
+%.o : %.S
+	$(CC) $(SFLAGS) -c $< -o $@
+
+%.o : %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
