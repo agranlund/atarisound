@@ -1,4 +1,5 @@
 #include <mint/osbind.h>
+#include <mint/cookie.h>
 #include "mxplay_utils.h"
 
 static int mfpParamsFromHz(int32 hz, uint16* ctrl, uint16* data) {
@@ -42,7 +43,6 @@ uint32 mxHookTimerA(void(*func)(void), uint32 hz)
     return real_hz;
 }
 
-
 void mxUnhookTimerA()
 {
     if (mxTimerAFunc != null) {
@@ -54,3 +54,12 @@ void mxUnhookTimerA()
     }
 }
 
+isa_t* isa;
+
+isa_t* isaInit() {
+    if (Getcookie(C__ISA, (long*)&isa) == C_FOUND) {
+        return isa;
+    }
+    isa = null;
+    return isa;
+}

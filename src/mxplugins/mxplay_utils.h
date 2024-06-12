@@ -3,7 +3,6 @@
 
 #include "plugin.h"
 
-
 #ifndef uint8
 typedef unsigned char       uint8;
 #endif
@@ -35,6 +34,8 @@ typedef int16               bool;
 #define null                0
 #endif
 
+// -----------------------------------------------------------------------
+
 extern void(*mxTimerAFunc)(void);
 extern uint32 mxTimerATicks;
 extern uint32 mxTimerALock;
@@ -44,7 +45,38 @@ extern void mxTimerAVec();
 extern uint32 mxHookTimerA(void(*func)(void), uint32 hz);
 extern void   mxUnhookTimerA();
 
+// -----------------------------------------------------------------------
 
+#define C__ISA  0x5F495341 /* '_ISA' */
+
+typedef struct
+{
+    unsigned short  version;
+    unsigned int    iobase;
+    unsigned int    membase;
+    unsigned short  irqmask;
+    unsigned char   drqmask;
+    unsigned char   endian;
+
+    void            (*outp)(unsigned short port, unsigned char data);
+    void            (*outpw)(unsigned short port, unsigned short data);
+    unsigned char   (*inp)(unsigned short port);
+    unsigned short  (*inpw)(unsigned short addr);
+} isa_t;
+
+extern isa_t* isa;
+
+extern isa_t* isaInit();
+
+static inline void outp(uint16 port, uint8 data) {
+    isa->outp(isa->iobase + port, data);
+}
+
+static inline uint8 inp(uint16 port) {
+    return isa->inp(isa->iobase + port);
+}
+
+// -----------------------------------------------------------------------
 
 #ifdef DEBUG
     #include "stdio.h"
