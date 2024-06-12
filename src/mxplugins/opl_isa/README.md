@@ -17,7 +17,7 @@ This plugin is based on vgmslap (c) MrKsoft.
 This plugin uses the em_inflate decompression library (c) Emmanuel Marty.
  https://github.com/emmanuel-marty
 
-
+---
 
 ## vgmslap
 
