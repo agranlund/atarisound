@@ -1,29 +1,24 @@
-------------------------------------------------------------------
- opl_isa.mxp : VGM OPL2/3 plugin for mxPlay
+# opl_isa.mxp : VGM OPL2/3 plugin for mxPlay
 
- For Atari with ISA bus and OPL2/3 card.
- OPL card is assumed to be located on port $388
+For Atari with ISA bus and OPL2/3 card.
+OPL card is assumed to be located on port $388
 
- Requires a running ISA_BIOS
- https://github.com/agranlund/raven/tree/main/sw/isa/isa_bios
-
-------------------------------------------------------------------
+Requires a running ISA_BIOS:
+https://github.com/agranlund/raven/tree/main/sw/isa/isa_bios
 
 
-mxPlay is copyright Miro Kropacek; miro.kropacek@gmail.com
-https://mxplay.sourceforge.net
+mxPlay is copyright Miro Kropacek.
+ https://mxplay.sourceforge.net
 
-This plugin is based on vgmslap (c) MrKsoft
-https://github.com/MrKsoft/vgmslap
+This plugin is based on vgmslap (c) MrKsoft.
+ https://github.com/MrKsoft/vgmslap
 
 This plugin uses the em_inflate decompression library (c) Emmanuel Marty.
-https://github.com/emmanuel-marty
+ https://github.com/emmanuel-marty
 
 
 
-------------------------------------------------------------------
-vgmslap
-------------------------------------------------------------------
+## vgmslap
 
 MIT License
 
@@ -47,9 +42,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-------------------------------------------------------------------
-em_inflate
-------------------------------------------------------------------
+## em_inflate
 
 Copyright (c) 2019 Emmanuel Marty
 
