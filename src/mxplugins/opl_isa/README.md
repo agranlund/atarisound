@@ -8,7 +8,7 @@ https://github.com/agranlund/raven/tree/main/sw/isa/isa_bios
 
 ---
 
-mxPlay is copyright Miro Kropacek.
+This plugin is for use with mxPlay (c) Miro Kropacek.
  https://mxplay.sourceforge.net
 
 This plugin is based on vgmslap (c) MrKsoft.
