@@ -33,8 +33,8 @@ const struct SInfo mx_info =
 };
 
 const struct SExtension mx_extensions[] = {
-	{ "VGM", "Video Game Music" },
-	{ "VGZ", "Video Game Music" },
+	{ "VGM", "Adlib" },
+	{ "VGZ", "Adlib" },
 	{ NULL, NULL }
 };
 
