@@ -7,3 +7,5 @@ src/gus
 src/ims
 src/vgm
 test/*
+*.d
+*.o
