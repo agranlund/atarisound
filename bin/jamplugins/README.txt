@@ -7,6 +7,7 @@ https://github.com/agranlund/atarisound
 ------------------------------------------------------------
 
 midi.jam        : Midi format 0/1 plugin
+opl_isa.jam     : OPL2/3 player for ISA cards
 jamc.rsc        : Color icons for Jam UI
 jamcx.rsc       : Color icons without Play-playlist button
 

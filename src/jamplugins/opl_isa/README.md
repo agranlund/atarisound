@@ -1,20 +1,25 @@
-opl.jam
-VGM OPL2/3 plugin for Jam Player.
----------------------------------
+# opl_isa.mxp : VGM OPL2/3 plugin for Jam
 
-This plugin is based on vgmslap (c) MrKsoft
-https://github.com/MrKsoft/vgmslap
+For Atari with ISA bus and OPL2/3 card.
+OPL card is assumed to be located on port $388
+
+Requires a running ISA_BIOS:
+https://github.com/agranlund/raven/tree/main/sw/isa/isa_bios
+
+---
+
+This plugin is for use with Jam (c) Cream.
+ https://www.creamhq.de/jam
+
+This plugin is based on vgmslap (c) MrKsoft.
+ https://github.com/MrKsoft/vgmslap
 
 This plugin uses the em_inflate decompression library (c) Emmanuel Marty.
-https://github.com/emmanuel-marty
+ https://github.com/emmanuel-marty
 
+---
 
-
-
-
----------------------------------
-vgmslap
----------------------------------
+## vgmslap
 
 MIT License
 
@@ -38,11 +43,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-
-
----------------------------------
-em_inflate
----------------------------------
+## em_inflate
 
 Copyright (c) 2019 Emmanuel Marty
 
