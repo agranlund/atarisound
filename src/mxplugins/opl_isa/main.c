@@ -20,6 +20,27 @@
 
 #include "../mxplay_utils.h"
 
+// -----------------------------------------------------------------------
+
+extern size_t em_inflate(const void *pCompressedData, size_t nCompressedDataSize, unsigned char *pOutData, size_t nMaxOutDataSize);
+extern uint8 vgmslap_init();
+extern uint8 vgmslap_load(uint8* buf);
+extern void  vgmslap_pause(uint8 paused);
+extern void  vgmslap_stop();
+extern void  vgmslap_play();
+extern void vgmslap_info(
+    uint8*    chipType,
+    uint32*   songLength,
+    int16**   songName,
+    int16**   songAuthor);
+
+static inline uint32 swap32(uint32* v) {
+    *v = ((*v & 0xff000000) >> 24) | ((*v & 0x00ff0000) >> 8) | ((*v & 0x0000ff00) << 8) | ((*v & 0x000000ff) << 24);
+    return *v;
+}
+
+// -----------------------------------------------------------------------
+
 extern struct SAudioPlugin mx_plugin;
 
 const struct SInfo mx_info =
@@ -33,27 +54,59 @@ const struct SInfo mx_info =
 };
 
 const struct SExtension mx_extensions[] = {
-	{ "VGM", "Adlib" },
-	{ "VGZ", "Adlib" },
+	{ "VGM", "VGM" },
+	{ "VGZ", "VGM" },
 	{ NULL, NULL }
 };
 
-const struct SParameter mx_settings[] = {
-    { NULL, 0, NULL, NULL }
-};
+static char tempBuffer[128];
+const char* chipNames[] = { "Unknown", "OPL1", "OPL2", "OPL3", "OPL1x2", "OPL2x2", "OPL1+2", "OPL3x2" };
 
-extern size_t em_inflate(const void *pCompressedData, size_t nCompressedDataSize, unsigned char *pOutData, size_t nMaxOutDataSize);
-extern uint8 vgmslap_init();
-extern uint8 vgmslap_load(uint8* buf);
-extern void  vgmslap_pause(uint8 paused);
-extern void  vgmslap_stop();
-extern void  vgmslap_play();
-
-static inline uint32 swap32(uint32* v) {
-    *v = ((*v & 0xff000000) >> 24) | ((*v & 0x00ff0000) >> 8) | ((*v & 0x0000ff00) << 8) | ((*v & 0x000000ff) << 24);
-    return *v;
+static int paramGetChipType() {
+    uint8 chipType = 0;
+    vgmslap_info(&chipType, 0, 0, 0);
+    chipType = (chipType < 8) ? chipType : 0;
+    mx_plugin.inBuffer.value = (long) chipNames[chipType];
+    return MXP_OK;
 }
 
+static void wchar_to_char(char* out, short* in, int buflen, char* def) {
+    out[0] = 0;
+    if (in && (in[0] != 0)) {
+        int pos = 0;
+        while ((in[pos] != 0) && (pos < (buflen-1))) {
+            out[pos] = (char) in[pos];
+            pos++;
+        }
+        out[pos] = 0;
+    }
+    if ((out[0] == 0) && def) {
+        strncpy(out, def, buflen-1);
+    }
+}
+
+static int paramGetSongName() {
+    int16* wstr = 0;
+    vgmslap_info(0, 0, &wstr, 0);
+    wchar_to_char(tempBuffer, wstr, 128, "Unknown");
+    mx_plugin.inBuffer.value = (long) &tempBuffer;
+    return MXP_OK;
+}
+
+static int paramGetAuthor() {
+    int16* wstr = 0;
+    vgmslap_info(0, 0, 0, &wstr);
+    wchar_to_char(tempBuffer, wstr, 128, "Unknown");
+    mx_plugin.inBuffer.value = (long) &tempBuffer;
+    return MXP_OK;
+}
+
+const struct SParameter mx_settings[] = {
+    { "Chip", MXP_PAR_TYPE_CHAR|MXP_FLG_INFOLINE|MXP_FLG_MOD_PARAM, NULL, paramGetChipType },
+    { "Track", MXP_PAR_TYPE_CHAR|MXP_FLG_INFOLINE|MXP_FLG_MOD_PARAM, NULL, paramGetSongName },
+    { "Author", MXP_PAR_TYPE_CHAR|MXP_FLG_MOD_PARAM, NULL, paramGetAuthor },
+    { NULL, 0, NULL, NULL }
+};
 
 // -----------------------------------------------------------------------
 

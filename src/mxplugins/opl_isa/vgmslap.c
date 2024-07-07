@@ -110,6 +110,13 @@ void processCommands(void);
 // Global variable definitions
 ///////////////////////////////////////////////////////////////////////////////
 
+#define OPL2_DELAY_REG      12      // 6
+#define OPL2_DELAY_DAT      64      // 35
+
+#define OPL3_DELAY_REG      4
+#define OPL3_DELAY_DAT      4
+
+
 // General program vars
 static uint8_t programState = prgstate_null;				// Controls current state of program (init, main loop, exit, etc)
 										// 0 = init, 1 = play, 2 = songEnd, 3 = quit
@@ -125,8 +132,8 @@ static uint32_t fileCursorLocation = 0; 		// Stores where we are in the file.
 static uint32_t isaBaseAddr;
 static uint16_t oplBaseAddr;				// Base port for OPL synth.
 static uint8_t detectedChip;				// What OPL chip we detect on the system
-static uint8_t oplDelayReg = 6;			// Delay required for OPL register write (set for OPL2 by default)
-static uint8_t oplDelayData = 35;			// Delay required for OPL data write (set for OPL2 by default)
+static uint8_t oplDelayReg = OPL2_DELAY_REG;			// Delay required for OPL register write (set for OPL2 by default)
+static uint8_t oplDelayData = OPL2_DELAY_DAT;			// Delay required for OPL data write (set for OPL2 by default)
 static uint8_t oplRegisterMap[0x1FF];			// Stores current state of OPL registers
 static uint8_t oplChangeMap[0x1FF];			// Written alongside oplRegisterMap, tracks bytes that need interpreted/drawn
 static uint8_t commandReg = 0; 			// Stores current OPL register to manipulate
@@ -343,6 +350,26 @@ static inline void endSong()
 // Main Functions
 ///////////////////////////////////////////////////////////////////////////////
 
+void vgmslap_info(
+    uint8_t*    chipType,
+    uint32_t*   songLength,
+    wchar_t**   songName,
+    wchar_t**   songAuthor)
+{
+    if (chipType) {
+        *chipType = vgmChipType;
+    }
+    if (songLength) {
+        *songLength = currentGD3Tag.tagLength;
+    }
+    if (songName) {
+        *songName = currentGD3Tag.trackNameE;
+    }
+    if (songAuthor) {
+        *songAuthor = currentGD3Tag.originalAuthorE;
+    }
+}
+
 
 void vgmslap_pause(uint8_t pause)
 {
@@ -362,7 +389,7 @@ void vgmslap_play()
     if (programState == prgstate_stopped) {
 	    resetOPL();
         seekSet(currentVGMHeader.vgmDataOffset+0x34);
-    	//delay(100);
+    	delay(100);
         if (detectedChip == 3 && vgmChipType == 5) {
             writeOPL(0x105,0x01);
         }
@@ -454,52 +481,42 @@ void resetTimer(void)
 // OPL Control Functions
 ///////////////////////////////////////////////////////////////////////////////
 
+void delayOPL(uint8_t count) {
+    // todo: replace this with delay() or usleep()
+
+    // original MS-DOS comment:
+    // The OPL requires a minimum time between writes.
+    // We can execute inp a certain number of times to ensure enough time has passed - why does that work?
+    // Because the time it takes to complete an inp is based on the ISA bus timings!
+    while(count--) {
+        inp(0x80);
+    }
+}
+
 // Send data to the OPL chip
 void writeOPL(uint16_t reg, uint8_t data)
 {
-    // Setup delay count
-    uint8_t registerDelay = oplDelayReg;
-    uint8_t dataDelay = oplDelayData;
-    
     // Second OPL2 and/or OPL3 secondary register set
     if (reg >= 0x100)
     {
         // First write to target register... 
         outp(oplBaseAddr+2, (reg - 0x100));
-        // Index register write delay.
-        // The OPL2 requires a minimum time between writes.  We can execute inp a certain number of times to ensure enough time has passed - why does that work?  Because the time it takes to complete an inp is based on the ISA bus timings!
-        while (registerDelay--)
-        {
-            inp(0x80);
-        }
+        delayOPL(oplDelayReg);
         
         // ...then go to +1 for the data
         outp(oplBaseAddr+3, data);
-        // Data register write delay.
-        while (dataDelay--)
-        {
-            inp(0x80);
-        }
+        delayOPL(oplDelayData);
     }
     // OPL2 and/or OPL3 primary register set
     else
     {
         // First write to target register... 
         outp(oplBaseAddr, reg);
-        // Index register write delay.
-        // The OPL2 requires a minimum time between writes.  We can execute inp a certain number of times to ensure enough time has passed - why does that work?  Because the time it takes to complete an inp is based on the ISA bus timings!
-        while (registerDelay--)
-        {
-            inp(0x80);
-        }
+        delayOPL(oplDelayReg);
         
         // ...then go to Base+1 for the data
         outp(oplBaseAddr+1, data);
-        // Data register write delay.
-        while (dataDelay--)
-        {
-            inp(0x80);
-        }
+        delayOPL(oplDelayData);
     }
     
     // Write the same data to our "register map", used for visualizing the OPL state, as well as the change map to denote that this bit needs to be interpreted and potentially drawn.
@@ -653,7 +670,7 @@ uint8_t detectOPL(void)
 	// Unmask and start timer 1
 	writeOPL(0x04, 0x21);
 	// Wait at least 80 usec (0.08ms) - a 2ms delay should be enough
-	delay(2);
+	delay(10);
 	// Read status register
 	statusRegisterResult2 = inp(oplBaseAddr);
 	// Reset timer 1, timer 2, and IRQ again
@@ -679,7 +696,7 @@ uint8_t detectOPL(void)
 			statusRegisterResult1 = inp(oplBaseAddr+2);
 			writeOPL(0x102, 0xFF);
 			writeOPL(0x104, 0x21);
-			delay(2);
+			delay(10);
 			statusRegisterResult2 = inp(oplBaseAddr+2);
 			writeOPL(0x104, 0x60);
 			writeOPL(0x104, 0x80);
@@ -696,18 +713,18 @@ uint8_t detectOPL(void)
 			return killProgram(7);
 			break;
 		case 1:
-			oplDelayReg = 6;
-			oplDelayData = 35;
+			oplDelayReg = OPL2_DELAY_REG;
+			oplDelayData = OPL2_DELAY_DAT;
 			dbgprintf("OPL2 detected at %Xh!\n", settings.oplBase);
 			break;
 		case 2:
-			oplDelayReg = 6;
-			oplDelayData = 35;
+			oplDelayReg = OPL2_DELAY_REG;
+			oplDelayData = OPL2_DELAY_DAT;
 			dbgprintf("Dual OPL2 detected at %Xh!\n", settings.oplBase);
 			break;
 		case 3:
-			oplDelayReg = 3;
-			oplDelayData = 3;
+			oplDelayReg = OPL3_DELAY_REG;
+			oplDelayData = OPL3_DELAY_DAT;
 			dbgprintf("OPL3 detected at %Xh!\n", settings.oplBase);
 			break;
 		
