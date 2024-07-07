@@ -1,19 +1,18 @@
-
-OUTBIN  = $(OUTDIR)/midi.jam
+OUTBIN  = $(OUTDIR)/opl_isa.jam
 
 ROOTDIR = ../../
 
 SYMFLAGS = -Wl,--traditional-format
 
 OBJS =  main.o \
-		md_midi.o 
+		em_inflate.o \
+		vgmslap.o
 
 LINKOBJS =  $(JAM_OBJS) $(LGCC_OBJ) $(OBJS) \
 
 CPUFLAGS = -m68000
 
-#OPTS = -DDEBUG
-OPTS =
+OPTS = -Os
 
 SFLAGS = 
 
@@ -27,7 +26,7 @@ CFLAGS = \
 	-Wall -Wno-multichar -Wno-unused-but-set-variable -Wno-unused-variable
 
 LFLAGS = \
-	$(LIBCMINI_LIB) $(LIBCMINI_LFL) \
+	$(LIBCMINI_LIB) -lgcc $(LIBCMINI_LFL) \
  	-Wl,--traditional-format \
 	-Wl,-Map,mapfile
 
@@ -43,10 +42,9 @@ $(OUTBIN): common Makefile $(LINKOBJS)
 
 clean:
 	rm -f *.o
+	rm -f $(OBJS)
 	rm -f mapfile
 #	rm -f $(OUTBIN)
 
 
 include ../Makefile.common
-
-

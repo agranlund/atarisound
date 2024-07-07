@@ -1,6 +1,6 @@
 # ------------------------------------------------------
 
-PLUGINS = midi.jam
+PLUGINS = midi.jam opl_isa.jam
 
 # ------------------------------------------------------
 .PHONY: all clean common $(PLUGINS)

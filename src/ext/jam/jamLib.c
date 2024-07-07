@@ -39,7 +39,7 @@ extern void jamCallHookAlert(char* msg);
 void (*jamVblFunc)(void);
 extern uint32 jamTimerAOld;
 extern void jamTimerAVec();
-void (*jamTimerAFunc)(void);
+extern void (*jamTimerAFunc)(void);
 extern int16 jamTimerALock;
 
 //-------------------------------------------------------------
