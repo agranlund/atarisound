@@ -670,7 +670,7 @@ uint8_t detectOPL(void)
 	// Unmask and start timer 1
 	writeOPL(0x04, 0x21);
 	// Wait at least 80 usec (0.08ms) - a 2ms delay should be enough
-	delay(10);
+	delay(100);
 	// Read status register
 	statusRegisterResult2 = inp(oplBaseAddr);
 	// Reset timer 1, timer 2, and IRQ again
