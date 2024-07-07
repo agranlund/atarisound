@@ -1,4 +1,4 @@
-# midi.mxp : MIDI plugin for Jam
+# midi.jam : MIDI plugin for Jam
 
 For any MIDI enabled Atari or clone.
 

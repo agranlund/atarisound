@@ -1,4 +1,4 @@
-# opl_isa.mxp : VGM OPL2/3 plugin for Jam
+# opl_isa.jam : VGM OPL2/3 plugin for Jam
 
 For Atari with ISA bus and OPL2/3 card.
 OPL card is assumed to be located on port $388
