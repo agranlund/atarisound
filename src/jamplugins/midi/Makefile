@@ -1,52 +1,11 @@
 
-OUTBIN  = $(OUTDIR)/midi.jam
 
-ROOTDIR = ../../
-
-SYMFLAGS = -Wl,--traditional-format
-
-OBJS =  main.o \
-		md_midi.o 
-
-LINKOBJS =  $(JAM_OBJS) $(LGCC_OBJ) $(OBJS) \
-
-CPUFLAGS = -m68000
-
-#OPTS = -DDEBUG
-OPTS =
-
-SFLAGS = 
-
-CFLAGS = \
-	$(LIBCMINI_INC) \
-	$(LIBCMINI_CFL) \
-	$(OPTS) \
-	-I$(ROOTDIR)ext/jam \
-	-std=c99 \
-	-fomit-frame-pointer -fno-exceptions \
-	-Wall -Wno-multichar -Wno-unused-but-set-variable -Wno-unused-variable
-
-LFLAGS = \
-	$(LIBCMINI_LIB) $(LIBCMINI_LFL) \
- 	-Wl,--traditional-format \
-	-Wl,-Map,mapfile
-
-
-## Rules
-.PHONY: clean all
-
-all: $(OUTBIN)
-
-$(OUTBIN): common Makefile $(LINKOBJS)
-	$(CC) $(CFLAGS) $(LINKOBJS) $(LFLAGS) -o $(OUTBIN)
-	$(STRIP) $(OUTBIN)
+all:
+	make -f Makefile-atari clean
+	make -f Makefile-atari
+	make -f Makefile-isa clean
+	make -f Makefile-isa
 
 clean:
-	rm -f *.o
-	rm -f mapfile
-#	rm -f $(OUTBIN)
-
-
-include ../Makefile.common
-
-
+	make -f Makefile-atari clean
+	make -f Makefile-isa clean

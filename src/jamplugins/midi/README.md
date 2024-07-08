@@ -1,9 +1,12 @@
-# midi.jam : MIDI plugin for Jam
+# midi.jam, midi_isa.jam: MIDI plugins for Jam
 
 For any MIDI enabled Atari or clone.
 
-This plugin uses bios routines so should work on
-any machine as long as it implements midi bios.
+midi.jam plays through bios routines and should
+work on any Atari as long as it implements midi bios.
+
+midi_isa.jam plays through an MPU401
+compatible interface on ISA port 330
 
 ---
 

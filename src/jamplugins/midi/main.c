@@ -26,19 +26,6 @@
 #include "mint/osbind.h"
 #include "mint/cookie.h"
 
-// TimerA or VBL playback
-#define ENABLE_TIMER_A      1
-#define TIMER_A_HZ          1000
-
-// Enable direct hardware access for known machines
-#define ENABLE_DIRECT_MIDI  1
-
-// Enable midi-out through bios
-#define ENABLE_BIOS_MIDI    1
-
-
-
-// -----------------------------------------------------------------------
 jamPluginInfo info = {
     JAM_INTERFACE_VERSION,      // interfaceVersion
     0x0004,                     // pluginVersion
@@ -68,22 +55,41 @@ jamPluginInfo info = {
     1,                          // supportsFastram
 };
 
+// -----------------------------------------------------------------------
+
+// TimerA or VBL playback
+#define ENABLE_TIMER_A      1
+#define TIMERA_HZ_FAST      1000
+#define TIMERA_HZ_SLOW      200
+
+// Midi drivers
+#ifndef ENABLE_MIDI_ACIA
+#define ENABLE_MIDI_ACIA    1
+#endif
+#ifndef ENABLE_MIDI_BIOS
+#define ENABLE_MIDI_BIOS    1
+#endif
+#ifndef ENABLE_MIDI_ISA
+#define ENABLE_MIDI_ISA     0
+#endif
 
 
 // -----------------------------------------------------------------------
-MD_MIDIFile* midi;
-
-void (*midiWrite)(uint8* buf, uint16 size);
-int32 (*biosMidiOut)(uint32 d);
-
-uint32 midiTimerTargetHz;
-uint32 midiTimerRealHz;
-uint32 midiMicrosPerTick;
-bool midiTimerA;
-uint16 savBuf[23*2*12];
+static MD_MIDIFile* midi;
+static void (*midiWrite)(uint8* buf, uint16 size);
+static uint32 midiTimerTargetHz;
+static uint32 midiTimerRealHz;
+static uint32 midiMicrosPerTick;
+static bool midiTimerA;
+static uint16 savBuf[23*2*12];
 
 // -----------------------------------------------------------------------
-static inline void midiWrite_acia(uint8* buf, uint16 size) {
+
+static void midiWrite_null(uint8* buf, uint16 size) {
+}
+
+#if ENABLE_MIDI_ACIA
+static void midiWrite_acia(uint8* buf, uint16 size) {
     for (short i=0; i<size; i++) {
         while(1) {
             volatile uint8 status = *((volatile uint8*)(0xfffffc04UL));
@@ -94,76 +100,103 @@ static inline void midiWrite_acia(uint8* buf, uint16 size) {
         }
     }
 }
+#endif
 
-static inline void midiWrite_bios(uint8* buf, uint16 size) {
-#if ENABLE_BIOS_MIDI
-
-#if 1
-    // safe in both TOS and MiNT
+// bios
+#if ENABLE_MIDI_BIOS
+static int32 (*biosMidiOut)(uint32 d) = 0;
+static void midiWrite_bios(uint8* buf, uint16 size) {
     uint8* end = &buf[size];
     while (buf != end) {
         int16 c = (int8)*buf++;
         biosMidiOut((3<<16) | c);
     }
-#else
-    // Hitchhikers Guide to the Bios.
-    //
-    // It is possible to do a BIOS call from an interrupt handler.
-    // More specifically, it is possible for exactly one interrupt handler to call
-    // the BIOS at a time.
-    //
-    // The basic problem is a critical section in the BIOS trap handler code. The
-    // critical section occurs when the registers are being saved or restored in the
-    // register save area; the variable savptr must be maintained correctly.
-    //
-    // -- DANGER --
-    // Only ONE interrupt handler may do this. That is, two interrupt handlers
-    // cannot nest and do BIOS calls in this manner.
-    //
-
-    //
-    // !! NOTE: This does not work under MiNT. Its bconout implementation does a
-    // of things not suitable for being called from interrupts.
-    //
-
-    if (size < 1)
-        return;
-
-    uint16 sr = jamDisableInterrupts();
-    #define savptr *((volatile uint32*)0x4a2)
-    #define savamt (23 * 2)
-    #if 0
-        savptr -= savamt;
-    #else    
-        uint32 oldsav = savptr;
-        savptr = (uint32)&savBuf[savamt*3];
-    #endif
-    Midiws(size - 1, buf);
-    #if 0
-        savptr += savamt;
-    #else
-        savptr = oldsav;
-    #endif
-    jamRestoreInterrupts(sr);
+}
 #endif
-#endif // ENABLE_BIOS_MIDI
+
+// isa
+#if ENABLE_MIDI_ISA
+
+typedef struct
+{
+    unsigned short  version;
+    unsigned int    iobase;
+    unsigned int    membase;
+    unsigned short  irqmask;
+    unsigned char   drqmask;
+    unsigned char   endian;
+
+    void            (*outp)(unsigned short port, unsigned char data);
+    void            (*outpw)(unsigned short port, unsigned short data);
+    unsigned char   (*inp)(unsigned short port);
+    unsigned short  (*inpw)(unsigned short addr);
+} isa_t;
+
+static isa_t* isa = 0;
+
+static inline isa_t* isaInit() {
+    #define C__ISA  0x5F495341 /* '_ISA' */
+    return (Getcookie(C__ISA, (long*)&isa) == C_FOUND) ? isa : 0;
 }
 
+unsigned short mpu401_port = 0x330;
+static inline bool mpu401_wait_stat(uint8 mask) {
+    int32 timeout = 100000;
+    while(timeout) {
+        if ((isa->inp(mpu401_port+1) & mask) == 0) {
+            return true;
+        }
+        timeout--;
+    }
+    return false;
+}
+static inline bool mpu401_wait_ack() {
+    while(1) {
+        if (!mpu401_wait_stat(0x80)) {
+            return false;
+        }
+        if (isa->inp(mpu401_port+0) == 0xFE) {
+            return true;
+        }
+    }
+}
+static inline bool mpu401_out(unsigned short p, unsigned char v) {
+    if (mpu401_wait_stat(0x40)) {
+        isa->outp(p, v);
+        return true;
+    }
+    return false;
+}
+
+static bool midiOpen_isa() {
+    if (isaInit()) {
+        mpu401_port = 0x330;
+        mpu401_out(mpu401_port+1, 0xff);    // reset
+        mpu401_wait_ack();                  // ack
+        mpu401_out(mpu401_port+1, 0x3f);    // uart mode
+        return true;
+    }
+    return false;
+}
+
+static void midiWrite_isa(uint8* buf, uint16 size) {
+    for (uint16 i=0; i<size; i++) {
+        if (!mpu401_out(mpu401_port, buf[i])) {
+            break;
+        }
+    }
+}
+#endif
 
 // -----------------------------------------------------------------------
-void(*midiEventHandler)(MD_midi_event*);
-void(*midiSysexHandler)(MD_sysex_event*);
 
-void midiEventHandler_acia(MD_midi_event *pev)      { midiWrite_acia(pev->data, pev->size); }
-void midiSysexHandler_acia(MD_sysex_event *pev)     { midiWrite_acia(pev->data, pev->size); }
-void midiEventHandler_bios(MD_midi_event *pev)      { midiWrite_bios(pev->data, pev->size); }
-void midiSysexHandler_bios(MD_sysex_event *pev)     { midiWrite_bios(pev->data, pev->size); }
-void midiEventHandler_null(MD_midi_event *pev)      { }
-void midiSysexHandler_null(MD_sysex_event *pev)     { }
+void midiEventHandler(MD_midi_event *pev) {
+    midiWrite(pev->data, pev->size);
+}
+void midiSysexHandler(MD_sysex_event *pev) {
+    midiWrite(pev->data, pev->size);
+}
 
-
-
-// -----------------------------------------------------------------------
 void midiUpdate_timerA() {
     if (midi) {
         MD_Update(midi, jamTimerATicks * midiMicrosPerTick);
@@ -211,27 +244,46 @@ jamPluginInfo* jamOnPluginInfo() {
 
 bool jamOnPluginStart() {
     midi = 0;
-    biosMidiOut = (int32(*)(uint32)) *(volatile uint32*)(0x57e + (3 * 4));
+    midiWrite = 0;
 
-    // todo: adjust for cpu speed?
-    midiTimerA = (bool)ENABLE_TIMER_A;
-    midiTimerTargetHz = TIMER_A_HZ;
+    // pick a timer frequency based on cpu model
+    uint32 cookie = 0;
+    midiTimerTargetHz = TIMERA_HZ_SLOW;
+    if ((Getcookie(C__CPU, (long*)&cookie) == C_FOUND) && (cookie >= 30)) {
+        midiTimerTargetHz = TIMERA_HZ_FAST;
+    }
 
-    // machine dependent output routine
+    // pick machine dependent output routine
     uint32 c_mch = 0;
     Getcookie(C__MCH, (long int*)&c_mch);
     bool is_t40 = ((c_mch & 0xffff) == 0x4d34);
     bool is_clone = (c_mch >= 0x00040000) || is_t40;
-    if (!is_clone && ENABLE_DIRECT_MIDI) {
-        midiEventHandler = midiEventHandler_acia;
-        midiSysexHandler = midiSysexHandler_acia;
-    }
-    else {
-        midiEventHandler = midiEventHandler_bios;
-        midiSysexHandler = midiSysexHandler_bios;
-        midiTimerA = false;
-    }
+    //midiTimerA = !is_clone && (bool)ENABLE_TIMER_A;
+    midiTimerA = (bool)ENABLE_TIMER_A;
 
+#if ENABLE_MIDI_ISA
+    if ((midiWrite == 0) && midiOpen_isa()) {
+        midiWrite = midiWrite_isa;
+        return true;
+    }
+#endif
+
+#if ENABLE_MIDI_ACIA
+    if ((midiWrite == 0) && !is_clone) {
+        midiWrite = midiWrite_acia;
+        return true;
+    }
+#endif
+
+#if ENABLE_MIDI_BIOS
+    if (midiWrite == 0) {
+        biosMidiOut = (int32(*)(uint32)) *(volatile uint32*)(0x57e + (3 * 4));
+        midiWrite = midiWrite_bios;
+        return true;
+    }
+#endif
+
+    midiWrite = midiWrite_null;
     return true;
 }
 

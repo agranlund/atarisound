@@ -1,9 +1,12 @@
-# midi.mxp : MIDI plugin for mxPlay
+# midi.mxp, midi_isa.mxp : MIDI plugin for mxPlay
 
 For any MIDI enabled Atari or clone.
 
-This plugin uses bios routines so should work on
-any machine as long as it implements midi bios.
+midi.mxp plays through bios routines and should
+work on any Atari as long as it implements midi bios.
+
+midi_isa.mxp plays through an MPU401
+compatible interface on ISA port 330
 
 ---
 
