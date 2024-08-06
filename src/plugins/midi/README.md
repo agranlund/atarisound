@@ -5,8 +5,7 @@ For any MIDI enabled Atari or clone.
 midi.mxp / midi.jam plays through Atari Bios routines and should
 work on any Atari as long as it implements midi bios.
 
-midi_isa.mxp / midi_isa.jam plays through an MPU401 compatible ISA device
-Device is assumed to be located on 0x330 unless otherwise detected in ISA_BIOS
+midi_isa.mxp / midi_isa.jam plays through an MPU401 compatible ISA device assumed to be located on 0x330 unless otherwise detected in ISA_BIOS
 
 ISA_BIOS is recommended but it can work without on some recognised computer types
 https://github.com/agranlund/raven/tree/main/sw/isa/isa_bios
