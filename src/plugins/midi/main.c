@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// mxPlay Midi plugin
+// MIDI pluging for mxPlay / Jam
 // 2024, anders.granlund
 //------------------------------------------------------------------------------
 //  This library is free software; you can redistribute it and/or
@@ -334,7 +334,7 @@ jamPluginInfo info = {
     " ",                        // ext5
     " ",                        // ext6
     " ",                        // ext7
-    "MD_MIDI",                  // pluginName
+    "MD_MIDIFile",              // pluginName
     "Anders Granlund",          // authorName
     "granlund23@yahoo.se",      // authorEmail
     "www.happydaze.se",         // authorUrl
