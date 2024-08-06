@@ -334,7 +334,7 @@ jamPluginInfo info = {
     " ",                        // ext5
     " ",                        // ext6
     " ",                        // ext7
-    "MIDI",                     // pluginName
+    "MD_MIDI",                  // pluginName
     "Anders Granlund",          // authorName
     "granlund23@yahoo.se",      // authorEmail
     "www.happydaze.se",         // authorUrl
