@@ -1,19 +1,25 @@
-# midi.mxp, midi_isa.mxp : MIDI plugin for mxPlay
+# midi / midi_isa : MIDI plugin for mxPlay and Jam
 
 For any MIDI enabled Atari or clone.
 
-midi.mxp plays through bios routines and should
+midi.mxp / midi.jam plays through Atari Bios routines and should
 work on any Atari as long as it implements midi bios.
 
-midi_isa.mxp plays through an MPU401
-compatible interface on ISA port 330
+midi_isa.mxp / midi_isa.jam plays through an MPU401 compatible ISA device
+Device is assumed to be located on 0x330 unless otherwise detected in ISA_BIOS
+
+ISA_BIOS is recommended but it can work without on some recognised computer types
+https://github.com/agranlund/raven/tree/main/sw/isa/isa_bios
 
 ---
 
-This plugin is for use with mxPlay (c) Miro Kropacek.
+MXP plugin is for use with mxPlay (c) Miro Kropacek.
  https://mxplay.sourceforge.net
 
-This plugin is based on MD_MIDIFile (c) Marco Colli.
+JAM plugin is for use with Jam (c) Cream.
+ https://www.creamhq.de/jam
+
+Plugin is based on MD_MIDIFile (c) Marco Colli.
  https://github.com/MajicDesigns/MD_MIDIFile
 
 ---

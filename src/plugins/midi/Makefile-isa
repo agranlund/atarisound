@@ -1,8 +1,8 @@
 
 ROOTDIR 	= ../../
-BIN  		= midi.mxp
+NAME  		= midi_isa
 OBJS 		= main.o md_midi.o
-OPTS 		= -Os
+OPTS 		= -Os -DENABLE_MIDI_ISA=1
 
 include ../Makefile.common
 

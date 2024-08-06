@@ -21,8 +21,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _PLUGIN_H_
-#define _PLUGIN_H_
+#ifndef _PLUGIN_MXP_H_
+#define _PLUGIN_MXP_H_
 
 #include <string.h>
 
@@ -100,4 +100,5 @@ struct SAudioPlugin
 	struct SParameter*	pSParameter;
 };
 
-#endif
+#endif //_PLUGIN_MXP_H_
+

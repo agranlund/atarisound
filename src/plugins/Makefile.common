@@ -4,16 +4,37 @@ STRIP	        = m68k-atari-mint-strip -s
 FLAGS	        = m68k-atari-mint-flags -S
 LIBCMINI_DIR	= $(ROOTDIR)ext/libcmini
 GCC_OBJS		= $(ROOTDIR)ext/lgcc.o
-MXP_OBJS		= $(ROOTDIR)mxplugins/mxplay_crt0.o $(ROOTDIR)mxplugins/mxplay_utils.o
+CPUFLAGS 	    := -m68000
 
-CPUFLAGS 	    = -m68000
-OUTDIR			= ../../../bin/mxplugins
+ifeq ($(player),jam)
+EXT   = jam
+POPTS = -DPLUGIN_JAM
+OUTDIR = ../../../bin/jamplugins
+BASEOBJS = \
+    $(ROOTDIR)plugins/crt0_jam.o \
+    $(ROOTDIR)plugins/pluginA.o \
+    $(ROOTDIR)plugins/plugin.o \
+    $(ROOTDIR)plugins/plugin_jam.o
+endif
+
+ifeq ($(player),mxp)
+EXT   = mxp
+POPTS = -DPLUGIN_MXP
+OUTDIR = ../../../bin/mxplugins
+BASEOBJS = \
+    $(ROOTDIR)plugins/crt0_mxp.o \
+    $(ROOTDIR)plugins/pluginA.o \
+    $(ROOTDIR)plugins/plugin.o
+endif
+
+BIN             = $(NAME).$(EXT)
 OUTBIN          = $(OUTDIR)/$(BIN)
 
-SFLAGS = $(OPT) $(CPUFLAGS)
+SFLAGS = $(OPTS) $(POPTS) $(CPUFLAGS)
 
-CFLAGS = $(OPTS) $(CPUFLAGS) \
+CFLAGS = $(OPTS) $(POPTS) $(CPUFLAGS) \
     -I$(LIBCMINI_DIR)/include \
+    -I$(ROOTDIR)plugins \
     -std=c99 -fomit-frame-pointer -fno-exceptions -ffast-math \
 	-Wall -Wno-multichar -Wno-unused-but-set-variable -Wno-unused-variable
 
@@ -22,21 +43,19 @@ LFLAGS = \
     -nodefaultlibs -nostdlib -nostartfiles -lcmini \
 	-Wl,-Map,mapfile
 
-LINKOBJS        = $(MXP_OBJS) $(GCC_OBJS) $(OBJS)
+LINKOBJS        = $(BASEOBJS) $(GCC_OBJS) $(OBJS)
 
 # ------------------------------------------------------
 
 .PHONY: clean all
 
-all: $(OUTBIN)
-
-$(OUTBIN) : $(BIN)
-	cp $(BIN) $(OUTBIN)
+all: $(BIN)
 
 $(BIN): common Makefile $(LINKOBJS)
 	$(CC) $(CFLAGS) $(LINKOBJS) $(LFLAGS) -o $(BIN)
 	$(STRIP) $(BIN)
 	$(FLAGS) $(BIN)
+	cp $(BIN) $(OUTBIN)
 
 clean:
 	rm -f $(BIN)

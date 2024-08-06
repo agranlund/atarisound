@@ -24,7 +24,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <ext.h>
-#include "../mxplay_utils.h"
+#include "plugin.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Type definitions
@@ -110,8 +110,10 @@ void processCommands(void);
 // Global variable definitions
 ///////////////////////////////////////////////////////////////////////////////
 
-#define OPL2_DELAY_REG      12      // 6
-#define OPL2_DELAY_DAT      64      // 35
+// these defines are now useconds rather than number of 8mhz ISA bus reads
+
+#define OPL2_DELAY_REG      6
+#define OPL2_DELAY_DAT      35
 
 #define OPL3_DELAY_REG      4
 #define OPL3_DELAY_DAT      4
@@ -488,9 +490,21 @@ void delayOPL(uint8_t count) {
     // The OPL requires a minimum time between writes.
     // We can execute inp a certain number of times to ensure enough time has passed - why does that work?
     // Because the time it takes to complete an inp is based on the ISA bus timings!
+    /*
     while(count--) {
         inp(0x80);
     }
+    */
+
+   // opl2:
+   //    3.3us index reg
+   //   23.0us data reg
+   //
+   // opl3:
+   //   0.00 us index reg
+   //   0.28 us data reg
+
+    mxDelay(count);
 }
 
 // Send data to the OPL chip

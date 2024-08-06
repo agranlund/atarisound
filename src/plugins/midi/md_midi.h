@@ -23,7 +23,7 @@
 #ifndef _MD_MIDI_H_
 #define _MD_MIDI_H_
 
-#include "jam_sdk.h"
+#include "plugin.h"
 
 #define MIDI_MAX_TRACKS 32
 

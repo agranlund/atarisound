@@ -1,7 +1,7 @@
 
 ROOTDIR 	= ../../
-BIN  		= opl_isa.mxp
-OBJS 		= main.o vgmslap.o em_inflate.o
+NAME 		= midi
+OBJS 		= main.o md_midi.o
 OPTS 		= -Os
 
 include ../Makefile.common

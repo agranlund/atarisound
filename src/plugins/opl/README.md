@@ -1,15 +1,19 @@
-# opl_isa.mxp : VGM OPL2/3 plugin for mxPlay
+# opl_isa : VGM OPL2/3 plugin for mxPlay and Jam
 
 For Atari with ISA bus and OPL2/3 card.
-OPL card is assumed to be located on port $388
+OPL card is assumed to be located on port 0x388 unless otherwise
+detected in ISA_BIOS
 
-Requires a running ISA_BIOS:
+ISA_BIOS is recommended but it can work without on some recognised computer types
 https://github.com/agranlund/raven/tree/main/sw/isa/isa_bios
 
 ---
 
-This plugin is for use with mxPlay (c) Miro Kropacek.
+MXP plugin is for use with mxPlay (c) Miro Kropacek.
  https://mxplay.sourceforge.net
+
+JAM plugin is for use with Jam (c) Cream.
+ https://www.creamhq.de/jam
 
 This plugin is based on vgmslap (c) MrKsoft.
  https://github.com/MrKsoft/vgmslap
