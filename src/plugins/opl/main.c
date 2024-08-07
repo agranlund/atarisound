@@ -33,11 +33,6 @@ extern void vgmslap_info(
     int16**   songName,
     int16**   songAuthor);
 
-static inline uint32 swap32(uint32* v) {
-    *v = ((*v & 0xff000000) >> 24) | ((*v & 0x00ff0000) >> 8) | ((*v & 0x0000ff00) << 8) | ((*v & 0x000000ff) << 24);
-    return *v;
-}
-
 // -----------------------------------------------------------------------
 
 static uint8* currentSongPtr = 0;
@@ -89,7 +84,7 @@ static bool songLoad(uint8* buf) {
         }
         // reallocate decompression buffer for final size
         uint32 fsize_decompressed = *((uint32*)&buf_decompressed[4]);
-        fsize_decompressed = 4 + swap32(&fsize_decompressed);
+        fsize_decompressed = 4 + swap32(fsize_decompressed);
         buf_decompressed = realloc(buf_decompressed, fsize_decompressed);
         if (!buf_decompressed) {
             free(buf_decompressed);
@@ -135,6 +130,52 @@ static bool songFinished() {
 
 
 
+
+
+// -----------------------------------------------------------------------
+// shared
+// -----------------------------------------------------------------------
+
+static char tempBuffer[128];
+static const char* chipNames[] = { "Unknown", "OPL1", "OPL2", "OPL3", "OPL1x2", "OPL2x2", "OPL1+2", "OPL3x2" };
+
+static void wchar_to_char(char* out, short* in, int buflen, char* def) {
+    out[0] = 0;
+    if (in && (in[0] != 0)) {
+        int pos = 0;
+        while ((in[pos] != 0) && (pos < (buflen-1))) {
+            out[pos] = (char) in[pos];
+            pos++;
+        }
+        out[pos] = 0;
+    }
+    if ((out[0] == 0) && def) {
+        strncpy(out, def, buflen-1);
+    }
+}
+
+static const char* infoChipType() {
+    uint8 chipType = 0;
+    vgmslap_info(&chipType, 0, 0, 0);
+    chipType = (chipType < 8) ? chipType : 0;
+    return chipNames[chipType];
+}
+
+static const char* infoSongName() {
+    int16* wstr = 0;
+    vgmslap_info(0, 0, &wstr, 0);
+    wchar_to_char(tempBuffer, wstr, 128, "Unknown");
+    return tempBuffer;
+}
+
+static const char* infoAuthor() {
+    int16* wstr = 0;
+    vgmslap_info(0, 0, 0, &wstr);
+    wchar_to_char(tempBuffer, wstr, 128, "Unknown");
+    return tempBuffer;
+}
+
+
 // -----------------------------------------------------------------------
 //
 // mxPlay
@@ -160,45 +201,19 @@ const struct SExtension mx_extensions[] = {
 	{ NULL, NULL }
 };
 
-static char tempBuffer[128];
-const char* chipNames[] = { "Unknown", "OPL1", "OPL2", "OPL3", "OPL1x2", "OPL2x2", "OPL1+2", "OPL3x2" };
 
 static int paramGetChipType() {
-    uint8 chipType = 0;
-    vgmslap_info(&chipType, 0, 0, 0);
-    chipType = (chipType < 8) ? chipType : 0;
-    mx_plugin.inBuffer.value = (long) chipNames[chipType];
+    mx_plugin.inBuffer.value = (long) infoChipType();
     return MXP_OK;
 }
 
-static void wchar_to_char(char* out, short* in, int buflen, char* def) {
-    out[0] = 0;
-    if (in && (in[0] != 0)) {
-        int pos = 0;
-        while ((in[pos] != 0) && (pos < (buflen-1))) {
-            out[pos] = (char) in[pos];
-            pos++;
-        }
-        out[pos] = 0;
-    }
-    if ((out[0] == 0) && def) {
-        strncpy(out, def, buflen-1);
-    }
-}
-
 static int paramGetSongName() {
-    int16* wstr = 0;
-    vgmslap_info(0, 0, &wstr, 0);
-    wchar_to_char(tempBuffer, wstr, 128, "Unknown");
-    mx_plugin.inBuffer.value = (long) &tempBuffer;
+    mx_plugin.inBuffer.value = (long) infoSongName();
     return MXP_OK;
 }
 
 static int paramGetAuthor() {
-    int16* wstr = 0;
-    vgmslap_info(0, 0, 0, &wstr);
-    wchar_to_char(tempBuffer, wstr, 128, "Unknown");
-    mx_plugin.inBuffer.value = (long) &tempBuffer;
+    mx_plugin.inBuffer.value = (long) infoAuthor();
     return MXP_OK;
 }
 
@@ -301,11 +316,11 @@ jamPluginInfo info = {
     0x1F,                       // support
     0,                          // datastart
     1,                          // supportsNextSongHook
-    0,                          // supportsName
-    0,                          // supportsComposer
+    1,                          // supportsName
+    1,                          // supportsComposer
     1,                          // supportsSongCount
     1,                          // supportsPreselect
-    0,                          // supportsComment
+    1,                          // supportsComment
     1,                          // supportsFastram
 };
 
@@ -330,6 +345,9 @@ void jamOnInfo(jamSongInfo* songInfo) {
     songInfo->songCount = 0;
     if (currentSongPtr) {
         songInfo->songCount = 1;
+        strcpy(songInfo->title, infoSongName());
+        strcpy(songInfo->composer, infoAuthor());
+        strcpy(songInfo->comments, infoChipType());
     }
 }
 
