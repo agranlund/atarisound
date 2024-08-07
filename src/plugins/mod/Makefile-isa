@@ -1,0 +1,22 @@
+ROOTDIR = ../../
+NAME  	= mod_isa
+OPTS 	= -Iims -Iims/core -Iims/playxm -Iims/dev -Os
+
+OBJS =  main.o \
+		ims/dev/mcp.o \
+		ims/dev/smpman.o \
+		ims/core/ims.o \
+		ims/core/imsmix.o \
+		ims/core/binfile.o \
+		ims/core/freq.o \
+		ims/core/irq.o \
+		ims/core/timer.o \
+		ims/playxm/xmload.o \
+		ims/playxm/xmlmod.o \
+		ims/playxm/xmrtns.o \
+		ims/playxm/xmtime.o \
+		ims/playxm/xmplay.o \
+		ims/devw/devwiw.o
+
+include ../Makefile.common
+

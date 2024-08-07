@@ -58,6 +58,11 @@ void mxUnhookTimerA()
 
 uint32 mxChangeTimerA(uint32 hz)
 {
+    // todo: can this be made platform independent and in a safe way?
+    // this function can and will be called from inside a triggered
+    // timer interrupt so special care would have to be taken.
+    // Hades and Raven has MFP in the usual location but I am unsure about Milan
+    // so we may need a special case for that machine here.
     mxTimerALock = 1;
     uint16 ctrl, data;
     uint32 real_hz = mfpParamsFromHz(hz, &ctrl, &data);

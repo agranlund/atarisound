@@ -49,26 +49,26 @@ extern void mxDelay(uint32 us);
 
 // -----------------------------------------------------------------------
 static inline uint16 mxDisableInterrupts() {
-    uint16 sr;
+    uint16 oldsr;
     __asm__ __volatile__(
         " move.w    sr,%0\n\t"
         " or.w      #0x0700,sr\n\t"
-    : "=d"(sr) : : "cc" );
-    return sr & 0x0F00;
+    : "=d"(oldsr) : : "cc" );
+    return oldsr & 0x0F00;
 }
 
-static inline void mxRestoreInterrupts(uint16 sr) {
+static inline void mxRestoreInterrupts(uint16 oldsr) {
     __asm__ __volatile__(
         " move.w    sr,d0\n\t"
         " and.w     #0xF0FF,d0\n\t"
         " or.w      %0,d0\n\t"
         " move.w    d0,sr\r\t"
-    : : "d"(sr) : "d0", "cc" );
+    : : "d"(oldsr) : "d0", "cc" );
 }
 
 // -----------------------------------------------------------------------
 static inline uint16 swap16(uint16 le) { uint16 be = ((le & 0xFF00) >> 8) | ((le << 8) & 0xFF00); return be; }
-
+static inline uint32 swap32(uint32 le) { uint32 be = (((le & 0xff000000) >> 24) | ((le & 0x00ff0000) >>  8) | ((le & 0x0000ff00) <<  8) | ((le & 0x000000ff) << 24)); return be; }
 
 // -----------------------------------------------------------------------
 extern uint32 mxIsaInit();
