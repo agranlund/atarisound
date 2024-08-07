@@ -9,3 +9,5 @@ src/vgm
 test/*
 *.d
 *.o
+libcmini.a
+stripx
