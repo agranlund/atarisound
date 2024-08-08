@@ -10,6 +10,8 @@
 //    -re-enabled and fixed pattern reordering to finally get rid
 //     of the mysterious SCB (Skaven Crash Bug)  ;)
 
+// modified for c99 and Atari by agranlund 2024
+
 
 #include <string.h>
 #include "binfile.h"
@@ -17,13 +19,14 @@
 #include "gmdplay.h"
 #include "err.h"
 
-static inline void putcmd(unsigned char *&p, unsigned char c, unsigned char d)
+static inline void putcmd(unsigned char **pp, unsigned char c, unsigned char d)
 {
+  unsigned char* p = *pp;
   *p++=c;
   *p++=d;
 }
 
-extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
+int mpLoadS3M(gmdmodule *m, binfile *file)
 {
   mpReset(m);
 
@@ -41,29 +44,40 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
     unsigned char channels[32];
   } hdr;
 
-  file.read(&hdr, sizeof(hdr));
+  bf_read(file, &hdr, sizeof(hdr));
+    ims_swap16((unsigned short*)&hdr.d1);
+    ims_swap16((unsigned short*)&hdr.orders);
+    ims_swap16((unsigned short*)&hdr.ins);
+    ims_swap16((unsigned short*)&hdr.pats);
+    ims_swap16((unsigned short*)&hdr.flags);
+    ims_swap16((unsigned short*)&hdr.cwt);
+    ims_swap16((unsigned short*)&hdr.ffv);
+    ims_swap32((unsigned long*)&hdr.d2);
+    ims_swap32((unsigned long*)&hdr.d3);
+    ims_swap16((unsigned short*)&hdr.special);
+
   if (memcmp(hdr.magic, "SCRM", 4))
     return errFormSig;
 
-  memcpy(m.name, hdr.name, 28);
-  m.name[28]=0;
+  memcpy(m->name, hdr.name, 28);
+  m->name[28]=0;
 
   int t,i;
-  m.channum=0;
+  m->channum=0;
   for (t=0; t<32; t++)
     if (hdr.channels[t]!=0xFF)
-      m.channum=t+1;
-  m.modsampnum=m.sampnum=m.instnum=hdr.ins;
-  m.patnum=hdr.orders;
-  m.tracknum=hdr.pats*(m.channum+1)+1;
-  m.options=MOD_S3M|((((hdr.cwt&0xFFF)<=0x300)||(hdr.flags&64))?MOD_S3M30:0);
-  m.loopord=0;
+      m->channum=t+1;
+  m->modsampnum=m->sampnum=m->instnum=hdr.ins;
+  m->patnum=hdr.orders;
+  m->tracknum=hdr.pats*(m->channum+1)+1;
+  m->options=MOD_S3M|((((hdr.cwt&0xFFF)<=0x300)||(hdr.flags&64))?MOD_S3M30:0);
+  m->loopord=0;
 
-  for (t=0; t<m.channum; t++)
+  for (t=0; t<m->channum; t++)
     if (((hdr.channels[t]&8)>>2)^((t+t+t)&2))
       break;
-  if (t==m.channum)
-    m.options|=MOD_MODPAN;
+  if (t==m->channum)
+    m->options|=MOD_MODPAN;
 
   unsigned char orders[256];
   unsigned short inspara[256];
@@ -71,71 +85,78 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
   unsigned long smppara[256];
   unsigned char defpan[32];
 
-  file.read(orders, m.patnum);
-  for (t=m.patnum-1; t>=0; t--)
+  bf_read(file, &orders, m->patnum);
+  for (t=m->patnum-1; t>=0; t--)
   {
     if (orders[t]<254)
       break;
-    m.patnum--;
+    m->patnum--;
   }
-  if (!m.patnum)
+  if (!m->patnum)
     return errFormMiss;
 
   short t2=0;
-  for (t=0; t<m.patnum; t++)
+  for (t=0; t<m->patnum; t++)
   {
     orders[t2]=orders[t];
     if (orders[t]!=254)
       t2++;
   }
-  short oldpatnum=m.patnum;
-  m.patnum=t2;
+  short oldpatnum=m->patnum;
+  m->patnum=t2;
 
-  m.ordnum=m.patnum;
+  m->ordnum=m->patnum;
 
-  for (t=0; t<m.patnum; t++)
+  for (t=0; t<m->patnum; t++)
     if (orders[t]==255)
       break;
-  m.endord=t;
+  m->endord=t;
 
-  file.read(inspara, m.instnum*2);
-  file.read(patpara, hdr.pats*2);
+  bf_read(file, &inspara, m->instnum*2);
+  for (int i=0; i<m->instnum; i++) {
+    ims_swap16(&inspara[i]);
+  }
+
+  bf_read(file, &patpara, hdr.pats*2);
+  for (int i=0; i<hdr.pats; i++) {
+    ims_swap16(&patpara[i]);
+  }
 
 //  hdr.mm|=0x80;
   for (i=0; i<32; i++)
     defpan[i]=(hdr.mm&0x80)?((hdr.channels[i]&8)?0x2F:0x20):0;
   if (hdr.dp==0xFC)
-    file.read(defpan, 32);
+    bf_read(file, &defpan, 32);
   for (i=0; i<32; i++)
     defpan[i]=(defpan[i]&0x20)?((defpan[i]&0xF)*0x11):((hdr.mm&0x80)?((hdr.channels[i]&8)?0xCC:0x33):0x80);
 
-  if (!mpAllocInstruments(m, m.instnum)||!mpAllocTracks(m, m.tracknum)||!mpAllocPatterns(m, m.patnum)||!mpAllocSamples(m, m.sampnum)||!mpAllocModSamples(m, m.modsampnum)||!mpAllocOrders(m, m.ordnum))
+  if (!mpAllocInstruments(m, m->instnum)||!mpAllocTracks(m, m->tracknum)||!mpAllocPatterns(m, m->patnum)||!mpAllocSamples(m, m->sampnum)||!mpAllocModSamples(m, m->modsampnum)||!mpAllocOrders(m, m->ordnum))
     return errAllocMem;
 
-  for (i=0; i<m.ordnum; i++)
-    m.orders[i]=(orders[i]==254)?0xFFFF:i;
+  for (i=0; i<m->ordnum; i++)
+    m->orders[i]=(orders[i]==254)?0xFFFF:i;
 
   gmdpattern *pp;
-  for (pp=m.patterns, t=0; t<m.patnum; pp++, t++)
+  for (pp=m->patterns, t=0; t<m->patnum; pp++, t++)
   {
     if (orders[t]==254)
       continue;
     pp->patlen=64;
     if ((orders[t]!=255)&&(orders[t]<hdr.pats))
     {
-      for (i=0; i<m.channum; i++)
-        pp->tracks[i]=orders[t]*(m.channum+1)+i;
-      pp->gtrack=orders[t]*(m.channum+1)+m.channum;
+      for (i=0; i<m->channum; i++)
+        pp->tracks[i]=orders[t]*(m->channum+1)+i;
+      pp->gtrack=orders[t]*(m->channum+1)+m->channum;
     }
     else
     {
-      for (i=0; i<m.channum; i++)
-        pp->tracks[i]=m.tracknum-1;
-      pp->gtrack=m.tracknum-1;
+      for (i=0; i<m->channum; i++)
+        pp->tracks[i]=m->tracknum-1;
+      pp->gtrack=m->tracknum-1;
     }
   }
 
-  for (i=0; i<m.instnum; i++)
+  for (i=0; i<m->instnum; i++)
   {
     struct
     {
@@ -156,8 +177,18 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
       long magic;
     } sins;
 
-    file.seek((long)inspara[i]*16);
-    file.read(&sins, sizeof(sins));
+    //file.seek((long)inspara[i]*16);
+    //file.read(&sins, sizeof(sins));
+    bf_seek(file, (long)inspara[i]*16);
+    bf_read(file, &sins, sizeof(sins));
+    ims_swap16((unsigned short*)&sins.sampptr);
+    ims_swap32((unsigned long*)&sins.length);
+    ims_swap32((unsigned long*)&sins.loopstart);
+    ims_swap32((unsigned long*)&sins.loopend);
+    ims_swap32((unsigned long*)&sins.volume);
+    ims_swap32((unsigned long*)&sins.c2spd);
+    ims_swap32((unsigned long*)&sins.magic);
+
     if ((sins.magic!=0x53524353)&&(sins.magic!=0))
       return errFormStruc;
     smppara[i]=sins.sampptr+(sins.sampptrh<<16);
@@ -169,12 +200,12 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
       sins.loopend>>=1;
     }
 
-    gmdinstrument &ip=m.instruments[i];
-    gmdsample &sp=m.modsamples[i];
-    sampleinfo &sip=m.samples[i];
+    gmdinstrument *ip=&(m->instruments[i]);
+    gmdsample *sp=&(m->modsamples[i]);
+    sampleinfo *sip=&(m->samples[i]);
 
-    memcpy(ip.name, sins.name, 28);
-    ip.name[28]=0;
+    memcpy(ip->name, sins.name, 28);
+    ip->name[28]=0;
     if (!sins.length)
       continue;
     if (sins.type!=1)
@@ -185,26 +216,26 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
       continue;
 
     int j;
-    sp.handle=i;
+    sp->handle=i;
     for (j=0; j<128; j++)
-      ip.samples[j]=i;
-    memcpy(sp.name, sins.dosname, 12);
-    sp.name[12]=0;
-    sp.normnote=-mcpGetNote8363(sins.c2spd);
-    sp.stdvol=(sins.volume>0x3F)?0xFF:(sins.volume<<2);
-    sp.stdpan=-1;
-    sp.opt=0;
+      ip->samples[j]=i;
+    memcpy(sp->name, sins.dosname, 12);
+    sp->name[12]=0;
+    sp->normnote=-mcpGetNote8363(sins.c2spd);
+    sp->stdvol=(sins.volume>0x3F)?0xFF:(sins.volume<<2);
+    sp->stdpan=-1;
+    sp->opt=0;
 
-    sip.length=sins.length;
-    sip.loopstart=sins.loopstart;
-    sip.loopend=sins.loopend;
-    sip.samprate=8363;
-    sip.type=((sins.flag&1)?mcpSampLoop:0)|((sins.flag&4)?mcpSamp16Bit:0)|((hdr.ffv==1)?0:mcpSampUnsigned);
+    sip->length=sins.length;
+    sip->loopstart=sins.loopstart;
+    sip->loopend=sins.loopend;
+    sip->samprate=8363;
+    sip->type=((sins.flag&1)?mcpSampLoop:0)|((sins.flag&4)?mcpSamp16Bit:0)|((hdr.ffv==1)?0:mcpSampUnsigned);
   }
 
   int bufsize=1024;
-  unsigned char *buffer=new unsigned char[bufsize];
-  unsigned char *temptrack=new unsigned char [2000];
+  unsigned char *buffer=malloc(bufsize);
+  unsigned char *temptrack=malloc(2000);
   if (!temptrack||!buffer)
     return errAllocMem;
 
@@ -213,20 +244,23 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
 
   for (t=0; t<hdr.pats; t++)
   {
-    file.seek(patpara[t]*16);
-    unsigned short patsize=file.gets();
+    bf_seek(file, patpara[t]*16);
+    unsigned short patsize;
+    bf_read(file, &patsize, 2);
+    ims_swap16(&patsize);
+
     if (patsize>bufsize)
     {
       bufsize=patsize;
-      delete buffer;
-      buffer=new unsigned char[bufsize];
+      free(buffer);
+      buffer=malloc(bufsize);
       if (!buffer)
         return errAllocMem;
     }
-    file.read(buffer, patsize);
+    bf_read(file, buffer, patsize);
 
     short j;
-    for (j=0; j<m.channum; j++)
+    for (j=0; j<m->channum; j++)
     {
       unsigned char *bp=buffer;
       unsigned char *tp=temptrack;
@@ -243,9 +277,9 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
         {
           if (setorgpan)
           {
-            putcmd(cp, cmdPlayNote|cmdPlayPan, defpan[j]);
-            putcmd(cp, cmdVolVibratoSetWave, 0x10);
-            putcmd(cp, cmdPitchVibratoSetWave, 0x10);
+            putcmd(&cp, cmdPlayNote|cmdPlayPan, defpan[j]);
+            putcmd(&cp, cmdVolVibratoSetWave, 0x10);
+            putcmd(&cp, cmdPitchVibratoSetWave, 0x10);
             setorgpan=0;
           }
 
@@ -277,8 +311,8 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
         {
           setorgpan=0;
           pan=defpan[j];
-          putcmd(cp, cmdVolVibratoSetWave, 0x10);
-          putcmd(cp, cmdPitchVibratoSetWave, 0x10);
+          putcmd(&cp, cmdVolVibratoSetWave, 0x10);
+          putcmd(&cp, cmdPitchVibratoSetWave, 0x10);
         }
 
         if (c&0x20)
@@ -290,7 +324,7 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
           else
           {
             if (nte==254)
-              putcmd(cp, cmdNoteCut, 0);
+              putcmd(&cp, cmdNoteCut, 0);
             nte=-1;
           }
         }
@@ -326,124 +360,124 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
 
         if ((ins!=-1)||(nte!=-1)||(vol!=-1)||(pan!=-1))
         {
-          unsigned char &act=*cp;
+          unsigned char *act=cp;
           *cp++=cmdPlayNote;
           if (ins!=-1)
           {
-            act|=cmdPlayIns;
+            *act|=cmdPlayIns;
             *cp++=ins;
           }
           if (nte!=-1)
           {
-            act|=cmdPlayNte;
+            *act|=cmdPlayNte;
             *cp++=nte;
           }
           if (vol!=-1)
           {
-            act|=cmdPlayVol;
+            *act|=cmdPlayVol;
             *cp++=vol;
           }
           if (pan!=-1)
           {
-            act|=cmdPlayPan;
+            *act|=cmdPlayPan;
             *cp++=pan;
           }
           if ((command==0x13)&&((data>>4)==0xD))
           {
-            act|=cmdPlayDelay;
+            *act|=cmdPlayDelay;
             *cp++=data&0xF;
           }
         }
 
         if (pansrnd)
-          putcmd(cp, cmdPanSurround, 0);
+          putcmd(&cp, cmdPanSurround, 0);
 
         switch (command)
 	{
         case 0x04:
           if (!data)
-            putcmd(cp, cmdSpecial, cmdContMixVolSlide);
+            putcmd(&cp, cmdSpecial, cmdContMixVolSlide);
           else
           if ((data&0x0F)==0x00)
-            putcmd(cp, cmdVolSlideUp, (data>>4)<<2);
+            putcmd(&cp, cmdVolSlideUp, (data>>4)<<2);
           else
           if ((data&0xF0)==0x00)
-            putcmd(cp, cmdVolSlideDown, (data&0xF)<<2);
+            putcmd(&cp, cmdVolSlideDown, (data&0xF)<<2);
           else
           if ((data&0x0F)==0x0F)
-            putcmd(cp, cmdRowVolSlideUp, (data>>4)<<2);
+            putcmd(&cp, cmdRowVolSlideUp, (data>>4)<<2);
           else
           if ((data&0xF0)==0xF0)
-            putcmd(cp, cmdRowVolSlideDown, (data&0xF)<<2);
+            putcmd(&cp, cmdRowVolSlideDown, (data&0xF)<<2);
           break;
         case 0x05:
           if (!data)
-            putcmd(cp, cmdSpecial, cmdContMixPitchSlideDown);
+            putcmd(&cp, cmdSpecial, cmdContMixPitchSlideDown);
           else
           if (data<0xE0)
-            putcmd(cp, cmdPitchSlideDown, data);
+            putcmd(&cp, cmdPitchSlideDown, data);
           else
           if (data<0xF0)
-            putcmd(cp, cmdRowPitchSlideDown, (data&0xF)<<2);
+            putcmd(&cp, cmdRowPitchSlideDown, (data&0xF)<<2);
           else
-            putcmd(cp, cmdRowPitchSlideDown, (data&0xF)<<4);
+            putcmd(&cp, cmdRowPitchSlideDown, (data&0xF)<<4);
           break;
         case 0x06:
           if (!data)
-            putcmd(cp, cmdSpecial, cmdContMixPitchSlideUp);
+            putcmd(&cp, cmdSpecial, cmdContMixPitchSlideUp);
           else
           if (data<0xE0)
-            putcmd(cp, cmdPitchSlideUp, data);
+            putcmd(&cp, cmdPitchSlideUp, data);
           else
           if (data<0xF0)
-            putcmd(cp, cmdRowPitchSlideUp, (data&0xF)<<2);
+            putcmd(&cp, cmdRowPitchSlideUp, (data&0xF)<<2);
           else
-            putcmd(cp, cmdRowPitchSlideUp, (data&0xF)<<4);
+            putcmd(&cp, cmdRowPitchSlideUp, (data&0xF)<<4);
           break;
         case 0x07:
-          putcmd(cp, cmdPitchSlideToNote, data);
+          putcmd(&cp, cmdPitchSlideToNote, data);
           break;
         case 0x08:
-          putcmd(cp, cmdPitchVibrato, data);
+          putcmd(&cp, cmdPitchVibrato, data);
           break;
         case 0x09:
-          putcmd(cp, cmdTremor, data);
+          putcmd(&cp, cmdTremor, data);
           break;
         case 0x0A:
-          putcmd(cp, cmdArpeggio, data);
+          putcmd(&cp, cmdArpeggio, data);
           break;
         case 0x0B:
-          putcmd(cp, cmdPitchVibrato, 0);
+          putcmd(&cp, cmdPitchVibrato, 0);
           if (!data)
-            putcmd(cp, cmdSpecial, cmdContVolSlide);
+            putcmd(&cp, cmdSpecial, cmdContVolSlide);
           if ((data&0x0F)&&(data&0xF0))
             data=0;
           if (data&0xF0)
-            putcmd(cp, cmdVolSlideUp, (data>>4)<<2);
+            putcmd(&cp, cmdVolSlideUp, (data>>4)<<2);
           else
           if (data&0x0F)
-            putcmd(cp, cmdVolSlideDown, (data&0xF)<<2);
+            putcmd(&cp, cmdVolSlideDown, (data&0xF)<<2);
           break;
         case 0x0C:
-          putcmd(cp, cmdPitchSlideToNote, 0);
+          putcmd(&cp, cmdPitchSlideToNote, 0);
           if (!data)
-            putcmd(cp, cmdSpecial, cmdContVolSlide);
+            putcmd(&cp, cmdSpecial, cmdContVolSlide);
           if ((data&0x0F)&&(data&0xF0))
             data=0;
           if (data&0xF0)
-            putcmd(cp, cmdVolSlideUp, (data>>4)<<2);
+            putcmd(&cp, cmdVolSlideUp, (data>>4)<<2);
           else
           if (data&0x0F)
-            putcmd(cp, cmdVolSlideDown, (data&0xF)<<2);
+            putcmd(&cp, cmdVolSlideDown, (data&0xF)<<2);
           break;
         case 0x0F:
-          putcmd(cp, cmdOffset, data);
+          putcmd(&cp, cmdOffset, data);
           break;
         case 0x11:
-          putcmd(cp, cmdRetrig, data);
+          putcmd(&cp, cmdRetrig, data);
 	  break;
 	case 0x12:
-	  putcmd(cp, cmdVolVibrato, data);
+	  putcmd(&cp, cmdVolVibrato, data);
 	  break;
         case 0x13:
           command=data>>4;
@@ -451,41 +485,41 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
 	  switch (command)
 	  {
           case 0x1:
-            putcmd(cp, cmdSpecial, data?cmdGlissOn:cmdGlissOff);
+            putcmd(&cp, cmdSpecial, data?cmdGlissOn:cmdGlissOff);
             break;
           case 0x2:
             break; // SET FINETUNE not ok (see protracker)
           case 0x3:
-            putcmd(cp, cmdPitchVibratoSetWave, (data&3)+0x10);
+            putcmd(&cp, cmdPitchVibratoSetWave, (data&3)+0x10);
             break;
           case 0x4:
-            putcmd(cp, cmdVolVibratoSetWave, (data&3)+0x10);
+            putcmd(&cp, cmdVolVibratoSetWave, (data&3)+0x10);
             break;
           case 0xC:
-            putcmd(cp, cmdNoteCut, data);
+            putcmd(&cp, cmdNoteCut, data);
 	    break;
           }
           break;
         case 0x15:
-          putcmd(cp, cmdPitchVibratoFine, data);
+          putcmd(&cp, cmdPitchVibratoFine, data);
           break;
         case 0x18: //panning
           break;
         }
       }
 
-      gmdtrack &trk=m.tracks[t*(m.channum+1)+j];
+      gmdtrack *trk=&m->tracks[t*(m->channum+1)+j];
       unsigned short len=tp-temptrack;
 
       if (!len)
-        trk.ptr=trk.end=0;
+        trk->ptr=trk->end=0;
       else
       {
-        trk.ptr=new unsigned char[len];
-        trk.end=trk.ptr+len;
-        if (!trk.ptr)
+        trk->ptr=malloc(len);
+        trk->end=trk->ptr+len;
+        if (!trk->ptr)
           return errAllocMem;
-        memcpy(trk.ptr, temptrack, len);
+        memcpy(trk->ptr, temptrack, len);
       }
     }
 
@@ -496,11 +530,11 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
     if (t==orders[0])
     {
       if (hdr.it!=6)
-        putcmd(cp, cmdTempo, hdr.it);
+        putcmd(&cp, cmdTempo, hdr.it);
       if (hdr.is!=125)
-        putcmd(cp, cmdSpeed, hdr.is);
+        putcmd(&cp, cmdSpeed, hdr.is);
       if (hdr.mv!=0x40)
-        putcmd(cp, cmdGlobVol, hdr.mv*4);
+        putcmd(&cp, cmdGlobVol, hdr.mv*4);
     }
 
     unsigned char row=0;
@@ -532,23 +566,23 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
       }
 
       int curchan=c&0x1F;
-      if (curchan>=m.channum)
+      if (curchan>=m->channum)
         continue;
 
       switch (command)
       {
       case 0x01:
         if (data)
-          putcmd(cp, cmdTempo, data);
+          putcmd(&cp, cmdTempo, data);
         break;
       case 0x02:
-        if (data<m.ordnum)
-          putcmd(cp, cmdGoto, data);
+        if (data<m->ordnum)
+          putcmd(&cp, cmdGoto, data);
         break;
       case 0x03:
         if (data>=0x64)
           data=0;
-        putcmd(cp, cmdBreak, (data&0x0F)+(data>>4)*10);
+        putcmd(&cp, cmdBreak, (data&0x0F)+(data>>4)*10);
         break;
       case 0x13:
         command=data>>4;
@@ -556,67 +590,75 @@ extern "C" int mpLoadS3M(gmdmodule &m, binfile &file)
         switch (command)
         {
         case 0xB:
-          putcmd(cp, cmdSetChan, curchan);
-          putcmd(cp, cmdPatLoop, data);
+          putcmd(&cp, cmdSetChan, curchan);
+          putcmd(&cp, cmdPatLoop, data);
           break;
         case 0xE:
           if (data)
-            putcmd(cp, cmdPatDelay, data);
+            putcmd(&cp, cmdPatDelay, data);
           break;
         }
         break;
       case 0x14:
         if (data>=0x20)
-          putcmd(cp, cmdSpeed, data);
+          putcmd(&cp, cmdSpeed, data);
         break;
       case 0x16:
         data=(data>0x3F)?0xFF:(data<<2);
-        putcmd(cp, cmdGlobVol, data);
+        putcmd(&cp, cmdGlobVol, data);
         break;
       }
     }
 
-    gmdtrack &trk=m.tracks[t*(m.channum+1)+m.channum];
+    gmdtrack *trk=&m->tracks[t*(m->channum+1)+m->channum];
     unsigned short len=tp-temptrack;
 
     if (!len)
-      trk.ptr=trk.end=0;
+      trk->ptr=trk->end=0;
     else
     {
-      trk.ptr=new unsigned char[len];
-      trk.end=trk.ptr+len;
-      if (!trk.ptr)
+      trk->ptr=malloc(len);
+      trk->end=trk->ptr+len;
+      if (!trk->ptr)
         return errAllocMem;
-      memcpy(trk.ptr, temptrack, len);
+      memcpy(trk->ptr, temptrack, len);
     }
   }
-  delete buffer;
-  delete temptrack;
+  free(buffer);
+  free(temptrack);
 
-  for (i=0; i<m.instnum; i++)
+  for (i=0; i<m->instnum; i++)
   {
-    gmdinstrument &ip=m.instruments[i];
-    gmdsample &sp=m.modsamples[i];
-    sampleinfo &sip=m.samples[i];
-    if (sp.handle==0xFFFF)
+    gmdinstrument *ip=&m->instruments[i];
+    gmdsample *sp=&m->modsamples[i];
+    sampleinfo *sip=&m->samples[i];
+    if (sp->handle==0xFFFF)
       continue;
 
-    int l=((sip.type&mcpSamp16Bit)?2:1)*sip.length;
-    file.seek(smppara[i]*16);
-    sip.ptr=new char [l+16];
-    if (!sip.ptr)
+
+    int l=((sip->type&mcpSamp16Bit)?2:1)*sip->length;
+    bf_seek(file, smppara[i]*16);
+    sip->ptr=malloc(l+16);
+    if (!sip->ptr)
       return errAllocMem;
-    file.read(sip.ptr, l);
+    bf_read(file, sip->ptr, l);
+    if (sip->type & mcpSamp16Bit) {
+        if (sip->type & mcpSampBigEndian) {
+            sip->type &= ~mcpSampBigEndian;
+        } else {
+            sip->type |= mcpSampBigEndian;
+        }
+    }
   }
 
-  for (i=m.channum-1; i>=0; i--)
+  for (i=m->channum-1; i>=0; i--)
   {
     if (chanused[i])
       break;
-    m.channum--;
+    m->channum--;
   }
 
-  if (!m.channum)
+  if (!m->channum)
     return errFormMiss;
 
   return errOk;

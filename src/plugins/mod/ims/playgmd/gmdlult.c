@@ -7,6 +7,9 @@
 //  -nb980510   Niklas Beisert <nbeisert@physik.tu-muenchen.de>
 //    -first release
 
+// modified for c99 and Atari by agranlund 2024
+
+
 #include <string.h>
 #include "binfile.h"
 #include "mcp.h"

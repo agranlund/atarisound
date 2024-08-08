@@ -7,6 +7,8 @@
 //  -nb980510   Niklas Beisert <nbeisert@physik.tu-muenchen.de>
 //    -first release
 
+// modified for c99 and Atari by agranlund 2024
+
 #include <stdlib.h>
 #include <string.h>
 #include "gmdplay.h"
@@ -38,30 +40,30 @@ static int (*calctimer)[2];
 static int calcn;
 static int sync;
 
-static void trackmoveto(gmdtrack &t, unsigned char row)
+static void trackmoveto(gmdtrack *t, unsigned char row)
 {
   while (1)
   {
-    if (t.ptr>=t.end)
+    if (t->ptr>=t->end)
       break;
-    if (t.ptr[0]>=row)
+    if (t->ptr[0]>=row)
       break;
-    t.ptr+=t.ptr[1]+2;
+    t->ptr+=t->ptr[1]+2;
   }
 }
 
 static void LoadPattern(unsigned short p, unsigned char r)
 {
-  const gmdpattern &pat=patterns[orders[p]];
-  patternlen=pat.patlen;
+  const gmdpattern *pat=&patterns[orders[p]];
+  patternlen=pat->patlen;
   if (r>=patternlen)
     r=0;
   currenttick=0;
   currentrow=r;
   currentpattern=p;
 
-  gtrack=tracks[pat.gtrack];
-  trackmoveto(gtrack, r);
+  gtrack=tracks[pat->gtrack];
+  trackmoveto(&gtrack, r);
 }
 
 static void PlayGCommand(const unsigned char *cmd, unsigned char len)
@@ -231,23 +233,23 @@ static int FindTick()
   return 1;
 }
 
-int gmdPrecalcTime(gmdmodule &m, int, int (*calc)[2], int n, int ite)
+int gmdPrecalcTime(gmdmodule *m, int, int (*calc)[2], int n, int ite)
 {
-  if (m.orders[0]==0xFFFF)
+  if (m->orders[0]==0xFFFF)
     return 0;
 
   sync=-1;
   calcn=n;
   calctimer=calc;
-  patterns=m.patterns;
-  orders=m.orders;
-  patternnum=m.ordnum;
-  tracks=m.tracks;
-  looppat=(m.loopord<m.ordnum)?m.loopord:0;
-  while (m.orders[looppat]==0xFFFF)
+  patterns=m->patterns;
+  orders=m->orders;
+  patternnum=m->ordnum;
+  tracks=m->tracks;
+  looppat=(m->loopord<m->ordnum)?m->loopord:0;
+  while (m->orders[looppat]==0xFFFF)
     looppat--;
 
-  endpat=m.endord;
+  endpat=m->endord;
 
   tempo=6;
   patdelay=0;

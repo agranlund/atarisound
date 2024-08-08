@@ -7,15 +7,28 @@
 #include "ims.h"
 #include "plugin.h"
 
+#if defined(MODSUPPORT_S3M)
+#define PLAYSUPPORT_GMD
+#endif
+
 
 // -----------------------------------------------------------------------
 // plugin
 // -----------------------------------------------------------------------
 
+#define PLAYTYPE_XMP        0
+#define PLAYTYPE_GMD        1
+
 static uint8 modType = 0;
+static uint8 playType = 0;
 static const char* modTypeNames[] = { "ProTracker", "FastTrackerII", "ScreamTracker" };
 static uint8* currentSongPtr = 0;
 static xmodule mod;
+
+#ifdef PLAYSUPPORT_GMD
+#include "gmdplay.h"
+static gmdmodule modgmd;
+#endif
 
 static bool pluginInit() {
     currentSongPtr = null;
@@ -43,9 +56,15 @@ static bool pluginInit() {
 
 static void songUnload() {
     if (currentSongPtr) {
-        xmpStopModule();
-        xmpFreeModule(&mod);
-        memset(&mod, 0, sizeof(xmodule));
+        if (playType == PLAYTYPE_XMP) {
+            xmpStopModule();
+            xmpFreeModule(&mod);
+            memset(&mod, 0, sizeof(xmodule));
+        }
+        #ifdef PLAYSUPPORT_GMD
+        else if (playType == PLAYTYPE_GMD) {
+        }
+        #endif
     }
     currentSongPtr = null;
 }
@@ -59,36 +78,76 @@ static bool songLoad(uint8* buf, uint32 siz) {
     bf_initref(&fil, buf, siz);
 
     int(*xmpLoad)(xmodule*m, binfile*f) = null;
+    #ifdef PLAYSUPPORT_GMD
+    int(*gmdLoad)(gmdmodule*m, binfile*f) = null;
+    #else
+    void* gmdLoad = null;
+    #endif    
+
     if (memcmp(&buf[0], "Extended Module: ", 17) == 0) {    // FastTrackerII
         modType = 1;
+        playType = PLAYTYPE_XMP;
         xmpLoad = xmpLoadModule;
-    } else if (memcmp(&buf[44], "SCRM", 4) == 0) {          // ScreamTracker (todo)
+    }
+    #ifdef MODSUPPORT_S3M    
+    else if (memcmp(&buf[44], "SCRM", 4) == 0) {          // ScreamTracker (todo)
         modType = 2;
-        xmpLoad = null;
-    } else {                                                // ProTracker / Generic
+        playType = PLAYTYPE_GMD;
+        gmdLoad = mpLoadS3M;
+    }
+    #endif        
+    else {                                                // ProTracker / Generic
         modType = 0;
+        playType = PLAYTYPE_XMP;
         xmpLoad = xmpLoadMOD;
     }
 
-    if (xmpLoad == null) {
-        err("xmpLoad");
-    }
+    dbgprintf("buf: %02x %02x %02x %02x", buf[44], buf[45], buf[46], buf[47]);
 
-    dbg("xmpLoadMOD");
-    if (xmpLoad(&mod, &fil) < 0) {
-        err("xmpLoadMOD");
-        songUnload();
-        return false;
-    }
+    if (playType == PLAYTYPE_XMP) {
+        if (xmpLoad == null) {
+            err("xmpLoad");
+            return false;
+        }
+        dbg("xmpLoadMOD");
+        if (xmpLoad(&mod, &fil) < 0) {
+            err("xmpLoadMOD");
+            songUnload();
+            return false;
+        }
 
-    currentSongPtr = buf;
+        currentSongPtr = buf;
 
-    dbg("xmpLoadSamples");
-    if (!xmpLoadSamples(&mod)) {
-        err("xmpLoadSamples");
-        songUnload();
-        return false;
+        dbg("xmpLoadSamples");
+        if (!xmpLoadSamples(&mod)) {
+            err("xmpLoadSamples");
+            songUnload();
+            return false;
+        }
     }
+    #ifdef PLAYSUPPORT_GMD
+    else if (playType == PLAYTYPE_GMD) {
+        if (gmdLoad == null) {
+            err("gmdLoad");
+            return false;
+        }
+        dbg("gmdLoadMOD");
+        if (gmdLoad(&modgmd, &fil) < 0) {
+            err("gmdLoadMOD");
+            songUnload();
+            return false;
+        }
+
+        currentSongPtr = buf;
+
+        dbg("gmdLoadSamples");
+        if (!mpLoadSamples(&modgmd)) {
+            err("gmdLoadSamples");
+            songUnload();
+            return false;
+        }
+    }
+    #endif
 
     dbg("songLoad: OK")
     return true;
@@ -96,19 +155,29 @@ static bool songLoad(uint8* buf, uint32 siz) {
 
 static void songStop() {
     if (currentSongPtr) {
-        dbg("songStop: stop");
-        xmpStopModule();
-        dbg("songStop: OK");
+        if (playType == PLAYTYPE_XMP) {
+            xmpStopModule();
+        }
+        #ifdef PLAYSUPPORT_GMD
+        else if (playType == PLAYTYPE_GMD) {
+            mpStopModule();
+        }
+        #endif
     }
 }
 
 static void songRestart() {
     if (currentSongPtr) {
-        dbg("songRestart: stop");
-        xmpStopModule();
-        dbg("songRestart: play");
-        xmpPlayModule(&mod);
-        dbg("songRestart: OK");
+        if (playType == PLAYTYPE_XMP) {
+            xmpStopModule();
+            xmpPlayModule(&mod);
+        }
+        #ifdef PLAYSUPPORT_GMD
+        else if (playType == PLAYTYPE_GMD) {
+            mpStopModule();
+            mpPlayModule(&modgmd);
+        }
+        #endif
     }
 }
 
@@ -144,7 +213,9 @@ const struct SInfo mx_info =
 const struct SExtension mx_extensions[] = {
 	{ "MOD", "ProTracker" },
 	{ "XM",  "FastTrackerII" },
-//	{ "S3M", "ScreamTracker" },
+#ifdef MODSUPPORT_S3M    
+	{ "S3M", "ScreamTracker" },
+#endif    
 	{ NULL, NULL }
 };
 
@@ -230,18 +301,19 @@ jamPluginInfo info = {
     JAM_INTERFACE_VERSION,      // interfaceVersion
     0x0001,                     // pluginVersion
     "2024.08.07",               // date
-    ".MOD",                     // ext0
-    ".XM",                      // ext1
-#if 0
-    ".S3M",                     // ext2
-#else
-    " ",                        // ext2
+    ".MOD",                     // ext
+    ".XM",                      // ext
+#ifdef MODSUPPORT_S3M    
+    ".S3M",                     // ext
 #endif    
-    " ",                        // ext3
-    " ",                        // ext4
-    " ",                        // ext5
-    " ",                        // ext6
-    " ",                        // ext7
+    " ",                        // ext
+    " ",                        // ext
+    " ",                        // ext
+    " ",                        // ext
+    " ",                        // ext
+#ifndef MODSUPPORT_S3M
+    " ",                        // ext
+#endif
     "OpenCP",                   // pluginName
     "Anders Granlund",          // authorName
     "granlund23@yahoo.se",      // authorEmail

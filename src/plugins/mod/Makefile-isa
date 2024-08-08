@@ -1,6 +1,7 @@
 ROOTDIR = ../../
 NAME  	= mod_isa
 OPTS 	= -Iims -Iims/core -Iims/playxm -Iims/dev -Os
+#OPTS += -DDEBUG
 
 OBJS =  main.o \
 		ims/dev/mcp.o \
@@ -17,6 +18,13 @@ OBJS =  main.o \
 		ims/playxm/xmtime.o \
 		ims/playxm/xmplay.o \
 		ims/devw/devwiw.o
+
+#OPTS += -Iims/playgmd -DMODSUPPORT_S3M
+#OBJS += ims/playgmd/gmdrtns.o \
+#		ims/playgmd/gmdtime.o \
+#		ims/playgmd/gmdplay.o \
+#		ims/playgmd/gmdls3m.o \
+
 
 include ../Makefile.common
 
