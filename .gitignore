@@ -11,3 +11,4 @@ test/*
 *.o
 libcmini.a
 stripx
+mapfile
