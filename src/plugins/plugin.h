@@ -40,9 +40,13 @@ extern volatile uint32 mxTimerATicks;
 extern volatile uint32 mxTimerALock;
 extern volatile uint32 mxTimerAOld;
 extern void mxTimerAVec();
+
 extern uint32 mxHookTimerA(void(*func)(void), uint32 hz);
 extern uint32 mxChangeTimerA(uint32 hz);
 extern void   mxUnhookTimerA();
+
+extern bool   mxHookIsaInterrupt(void(*func)(void), uint16 inum);
+extern void   mxUnhookIsaInterrupt();
 
 extern void mxCalibrateDelay();
 extern void mxDelay(uint32 us);
@@ -72,7 +76,8 @@ static inline uint32 swap32(uint32 le) { uint32 be = (((le & 0xff000000) >> 24) 
 
 // -----------------------------------------------------------------------
 extern uint32 mxIsaInit();
-extern uint16 mxIsaPort(const char* dev, uint8 idx, uint16 fallback);
+extern uint16 mxIsaPort(const char* dev_id, uint8 dev_idx, uint8 port_idx, uint16 fallback);
+extern uint8  mxIsaIrq(const char* dev_id, uint8 dev_idx, uint8 irq_idx, uint8 fallback);
 
 extern void(*outp)(uint16 port, uint8 data);
 extern void(*outpw)(uint16 port, uint16 data);

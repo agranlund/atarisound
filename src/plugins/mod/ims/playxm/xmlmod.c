@@ -161,7 +161,7 @@ static int loadmod(xmodule *m, binfile *file, int chan, int sig, int opt)
 
   for (i=0; i<m->ninst; i++)
   {
-    struct __attribute((packed))
+    struct //__attribute((packed))
     {
       char name[22];
       unsigned short length;

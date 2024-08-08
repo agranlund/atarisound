@@ -238,14 +238,30 @@ uint32 mxIsaInit() {
     return isabase;
 }
 
-uint16 mxIsaPort(const char* dev, uint8 idx, uint16 fallback) {
-
+uint16 mxIsaPort(const char* dev_id, uint8 dev_idx, uint8 port_idx, uint16 fallback) {
     if (isa) {
-        isa_dev_t* isadev = isa->find_dev(dev, idx);
-        if (isadev) {
-            return isadev->port[0];
+        isa_dev_t* dev = isa->find_dev(dev_id, dev_idx);
+        if (dev) {
+            return dev->port[port_idx];
         }
     }
     return fallback;
+}
+
+uint8 mxIsaIrq(const char* dev_id, uint8 dev_idx, uint8 irq_idx, uint8 fallback) {
+    if (isa) {
+        isa_dev_t* dev = isa->find_dev(dev_id, dev_idx);
+        if (dev) {
+            return dev->irq[irq_idx];
+        }
+    }
+    return fallback;
+}
+
+bool mxHookIsaInterrupt(void(*func)(void), uint16 inum) {
+    return false;
+}
+
+void mxUnhookIsaInterrupt() {
 }
 

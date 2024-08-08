@@ -40,13 +40,13 @@ typedef struct
   unsigned short vibsweep;
 } xmpsample;
 
-typedef struct __attribute((packed))
+typedef struct
 {
   char name[32];
   unsigned short samples[128];
 } xmpinstrument;
 
-typedef struct __attribute((packed))
+typedef struct
 {
   char name[21];
   char ismod;
@@ -72,13 +72,13 @@ typedef struct __attribute((packed))
   unsigned char panpos[256];
 } xmodule;
 
-typedef struct __attribute((packed))
+typedef struct
 {
   unsigned char globvol;
   unsigned char globvolslide;
 } xmpglobinfo;
 
-typedef struct __attribute((packed))
+typedef struct
 {
   unsigned char note;
   unsigned char vol;

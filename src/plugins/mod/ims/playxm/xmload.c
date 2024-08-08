@@ -32,7 +32,7 @@ int xmpLoadModule(xmodule *m, binfile *file)
   m->orders=0;
   m->ismod=0;
 
-  struct __attribute((packed))
+  struct //__attribute((packed))
   {
     char sig[17];
     char name[20];
@@ -42,7 +42,7 @@ int xmpLoadModule(xmodule *m, binfile *file)
     unsigned long hdrsize;
   } head1;
 
-  struct __attribute((packed))
+  struct //__attribute((packed))
   {
     unsigned short nord;
     unsigned short loopord;
@@ -125,19 +125,26 @@ int xmpLoadModule(xmodule *m, binfile *file)
 
   for (i=0; i<head2.npat; i++)
   {
-    struct __attribute((packed))
+    struct //__attribute((packed))
     {
       unsigned long len;
       unsigned char ptype;
       unsigned short rows;
       unsigned short patdata;
     } pathead;
-    bf_read(file, &pathead, sizeof(pathead));
+
+    // read each entry individually since this stuff is not aligned and would break 68000
+    #define sizeof_pathead (4+1+2+2)
+    bf_read(file, &pathead.len,     4); 
+    bf_read(file, &pathead.ptype,   1);
+    bf_read(file, &pathead.rows,    2);
+    bf_read(file, &pathead.patdata, 2);
+
     ims_swap32(&pathead.len);
     ims_swap16(&pathead.rows);
     ims_swap16(&pathead.patdata);
 
-    bf_seekcur(file, (pathead.len-sizeof(pathead)));
+    bf_seekcur(file, (pathead.len-sizeof_pathead));
     m->patlens[i]=pathead.rows;
     m->patterns[i]=malloc(pathead.rows*head2.nchan*5);
     if (!m->patterns[i])
@@ -177,14 +184,22 @@ int xmpLoadModule(xmodule *m, binfile *file)
     xmpenvelope *env=m->envelopes+2*i;
     smps[i]=0;
     msmps[i]=0;
-    struct __attribute((packed))
+
+    struct //__attribute((packed))
     {
       unsigned long size;
       char name[22];
       char type;
       unsigned short samp;
     } ins1;
-    bf_read(file, &ins1, sizeof(ins1));
+
+    // read each entry individually since this stuff is not aligned and would break 68000
+    #define sizeof_ins1 (4+22+1+2)
+    bf_read(file, &ins1.size, 4);
+    bf_read(file, &ins1.name, 22);
+    bf_read(file, &ins1.type, 1);
+    bf_read(file, &ins1.samp, 2);
+
     ims_swap32(&ins1.size);
     ims_swap16(&ins1.samp);
     memcpy(ip->name, ins1.name, 22);
@@ -194,11 +209,11 @@ int xmpLoadModule(xmodule *m, binfile *file)
     instsmpnum[i]=ins1.samp;
     if (!ins1.samp)
     {
-      bf_seekcur(file, (ins1.size-sizeof(ins1)));
+      bf_seekcur(file, (ins1.size-sizeof_ins1));
       continue;
     }
 
-    struct __attribute((packed))
+    struct //__attribute((packed))
     {
       unsigned long shsize;
       unsigned char snum[96];
@@ -211,7 +226,8 @@ int xmpLoadModule(xmodule *m, binfile *file)
       unsigned short volfade;
       unsigned short res;
     } ins2;
-    bf_read(file, &ins2, sizeof(ins2));
+    #define sizeof_ins2 sizeof(ins2)
+    bf_read(file, &ins2, sizeof_ins2);
     ims_swap32(&ins2.shsize);
     ims_swap16(&ins2.volfade);
     ims_swap16(&ins2.res);
@@ -222,7 +238,7 @@ int xmpLoadModule(xmodule *m, binfile *file)
         }
     }
 
-    bf_seekcur(file, (ins1.size-sizeof(ins1)-sizeof(ins2)));
+    bf_seekcur(file, (ins1.size-sizeof_ins1-sizeof_ins2));
 
     smps[i]=malloc(sizeof(sampleinfo)*ins1.samp);
     msmps[i]=malloc(sizeof(xmpsample)*ins1.samp);
@@ -306,7 +322,7 @@ int xmpLoadModule(xmodule *m, binfile *file)
     }
     for (j=0; j<ins1.samp; j++)
     {
-      struct __attribute((packed))
+      struct //__attribute((packed))
       {
         unsigned long samplen;
         unsigned long loopstart;
