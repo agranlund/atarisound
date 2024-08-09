@@ -118,7 +118,7 @@ static inline bool mpu401_out(unsigned short p, unsigned char v) {
 static bool midiOpen_isa() {
     mxCalibrateDelay();
     if (mxIsaInit()) {
-        mpu401_port = mxIsaPort("PNPB006", 0, 0x330);
+        mpu401_port = mxIsaPort("PNPB006", 0, 0, 0x330);
         mpu401_out(mpu401_port+1, 0xff);    // reset
         mpu401_wait_ack();                  // ack
         mpu401_out(mpu401_port+1, 0x3f);    // uart mode

@@ -32,6 +32,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include "ext.h"
 #include "imsdev.h"
 #include "mcp.h"
 #include "mix.h"
@@ -42,12 +43,17 @@
 #define MAXSAMPLES   256
 #define FXBUFFERSIZE 65536
 
+#define GUSTYPE_GF1     0
+#define GUSTYPE_AMD     1
+
 extern sounddevice mcpInterWave;
 
 static unsigned short iwPort;
 static unsigned char iwIRQ;
 static unsigned char iwRev;
+static unsigned char iwType;
 
+static unsigned char activechans;
 static unsigned char bufferbank;
 static unsigned long bufferpos;
 
@@ -72,9 +78,12 @@ static inline void delayIW(unsigned int len) {
     // len is number of ISA reads MS-DOS machine
 
     // todo: better delay..
+    /*
     for (unsigned int i=0; i<=len; i++) {
-        inp(0x300);
+        inp(iwPort+0x107);
     }
+    */
+    mxDelay(len);
 }
 
 static unsigned char inpIW(unsigned short p)                { return inp(iwPort+p); }
@@ -84,15 +93,27 @@ static void outwIW(unsigned char c, unsigned short v)       { outp(iwPort+0x103,
 static unsigned char inIW(unsigned char c)                  { outp(iwPort+0x103, c); delayIW(4); return inp(iwPort+0x105); }
 static unsigned short inwIW(unsigned char c)                { outp(iwPort+0x103, c); delayIW(4); return inpw(iwPort+0x104);}
 
-static unsigned char peekIW(unsigned long adr)              { outwIW(0x43, adr); outIW(0x44, adr>>16); return inpIW(0x107); }
-static void pokeIW(unsigned long adr, unsigned char data)   { outwIW(0x43, adr); outIW(0x44, adr>>16); outpIW(0x107, data); }
+static void outdIW(unsigned char c, unsigned char v) {
+    if (iwType == GUSTYPE_AMD) {
+        outIW(c, v);
+    } else {
+        outp(iwPort+0x103, c);
+        delayIW(4);
+        outp(iwPort+0x105, v);
+        delayIW(8);
+        outp(iwPort+0x105, v);
+    }
+}
 
-static void setmode(unsigned char m)                        { outIW(0x00, m); }
+static unsigned char peekIW(unsigned long adr)              { outwIW(0x43, (adr & 0xffff)); outdIW(0x44, (adr>>16)&0xff); return inpIW(0x107); }
+static void pokeIW(unsigned long adr, unsigned char data)   { outwIW(0x43, (adr & 0xffff)); outdIW(0x44, (adr>>16)&0xff); outpIW(0x107, data); }
+
+static void setmode(unsigned char m)                        { outdIW(0x00, m); }
 static unsigned char getmode()                              { return inIW(0x80); }
-static void setvmode(unsigned char m)                       { outIW(0x0D, m); }
+static void setvmode(unsigned char m)                       { outdIW(0x0D, m); }
 static unsigned char getvmode()                             { return inIW(0x8D); }
-static void setbank(char b)                                 { outIW(0x10,b); }
-static unsigned char getbank()                              { return (inIW(0x90)&0x03); }
+static void setbank(char b)                                 { if (iwType == GUSTYPE_AMD) { outIW(0x10,b); } }
+static unsigned char getbank()                              { return (iwType == GUSTYPE_AMD) ? (inIW(0x90)&0x03) : 0; }
 
 static void settimer(unsigned char o)                       { outIW(0x45, o); }
 static void settimerlen(unsigned char l)                    { outIW(0x46, l); }
@@ -100,20 +121,18 @@ static void settimerlen(unsigned char l)                    { outIW(0x46, l); }
 static void setvst(unsigned char s)                         { outIW(0x07, s); }
 static void setvend(unsigned char s)                        { outIW(0x08, s); }
 static void selvoc(char ch)                                 { outpIW(0x102, ch); }
-static void setfreq(unsigned short frq)                     { outwIW(0x01, frq); }
+static void setfreq(unsigned short frq)                     { if (iwType == GUSTYPE_AMD) { outwIW(0x01, frq); } else { outwIW(0x01, frq&~1); } }
 static void setvol(unsigned short vol)                      { outwIW(0x09, vol<<4); }
 static unsigned short getvol()                              { return inwIW(0x89)>>4; }
+static void setpan(unsigned char pan)                       { outIW(0x0C, pan); }
+
 
 static void resetIW()
 {
     outIW(0x4C, 0);
-    for (int i=0; i<20; i++) {
-        inp(iwPort+0x107);
-    }
+    delay(20);
     outIW(0x4C, 1);
-    for (int i=0; i<20; i++) {
-        inp(iwPort+0x107);
-    }
+    delay(20);
 }
 
 static char setenhmode(unsigned char m)
@@ -128,53 +147,71 @@ static char setenhmode(unsigned char m)
 
 static void setrelvoll(unsigned short vol,char mode)
 {
-    vol=0xfff-linvol[vol];
-    if (!mode) {
-        outwIW(0x13,vol<<4);
+    if (iwType == GUSTYPE_AMD) {
+        vol=0xfff-linvol[vol];
+        if (!mode) {
+            outwIW(0x13,vol<<4);
+        }
+        outwIW(0x1C,vol<<4);
     }
-    outwIW(0x1C,vol<<4);
 }
 
 static void setrelvolr(unsigned short vol,char mode)
 {
-    vol=0xfff-linvol[vol];
-    if (!mode) {
-        outwIW(0x0c,vol<<4);
+    if (iwType == GUSTYPE_AMD) {
+        vol=0xfff-linvol[vol];
+        if (!mode) {
+            outwIW(0x0c,vol<<4);
+        }
+        outwIW(0x1B,vol<<4);
     }
-    outwIW(0x1B,vol<<4);
 }
 
 static void seteffvol(unsigned short vol)
 {
-    vol=0xfff-vol;
-    outwIW(0x16,vol<<4);
-    outwIW(0x1D,vol<<4);
+    if (iwType == GUSTYPE_AMD) {
+        vol=0xfff-vol;
+        outwIW(0x16,vol<<4);
+        outwIW(0x1D,vol<<4);
+    }
 }
 
 static void seteffchan(char ch)
 {
-    outIW(0x14,ch);
+    if (iwType == GUSTYPE_AMD) {
+        outIW(0x14,ch);
+    }
 }
 
 static void setpoint(unsigned long p, unsigned char t)
 {
-    t=(t==1)?0x02:(t==2)?0x04:(t==3)?0x11:0x0A;  // new: t==3 -> FX buffer write position
-    outwIW(t, p>>7);
-    outwIW(t+1, p<<9);
+    if (iwType == GUSTYPE_AMD) {
+        t=(t==1)?0x02:(t==2)?0x04:(t==3)?0x11:0x0A;  // new: t==3 -> FX buffer write position
+        outwIW(t, p>>7);
+        outwIW(t+1, p<<9);
+    } else {
+        t=(t==1)?0x02:(t==2)?0x04:0x0A;
+        outwIW(t, (p>>7)&0x1FFF);
+        outwIW(t+1, p<<9);
+    }
 }
 
 static unsigned long getpoint()
 {
-    return (inwIW(0x8A)<<7)|(inwIW(0x8B)>>9);
+    if (iwType == GUSTYPE_AMD) {
+        return (inwIW(0x8A)<<7)|(inwIW(0x8B)>>9);
+    } else {
+        return (inwIW(0x8A)<<16)|inwIW(0x8B);
+    }
 }
 
 
-static unsigned long findMem(unsigned long max)
+static unsigned long findMemAMD(unsigned long max)
 {
     char v0,v1,v2,v3;
     unsigned long fnd=0;
 
-    //dbgprintf("findmem %d\r\n", max / 1024);
+    //dbgprintf("findmem %d", max / 1024);
     unsigned long bankmax = 4 * 1024 * 1024UL;
     unsigned long step    = 64 * 1024;
     unsigned long count   = bankmax / step;
@@ -194,7 +231,7 @@ static unsigned long findMem(unsigned long max)
         for (i=0; i<count; i++)
         {
             if (fnd==max) {
-                //dbgprintf("found max\r\n");
+                //dbgprintf("found max");
                 break;
             }
 
@@ -203,7 +240,7 @@ static unsigned long findMem(unsigned long max)
             pokeIW(iwMem[b],testval);
             pokeIW(iwMem[b]+1,testval+1);
             if ((peekIW(iwMem[b])!=testval)||(peekIW(iwMem[b]+1)!=(testval+1))||(peekIW(ba)!=0x55)||(peekIW(ba+1)!=0x56)) {
-                //dbgprintf("rw mismatch %02x,%02x, %02x,%02x, %02x,%02x\r\n", peekIW(ba), peekIW(ba+1), peekIW(iwMem[b]), peekIW(iwMem[b+1]), testval, testval+1);
+                //dbgprintf("rw mismatch %02x,%02x, %02x,%02x, %02x,%02x", peekIW(ba), peekIW(ba+1), peekIW(iwMem[b]), peekIW(iwMem[b+1]), testval, testval+1);
                 break;
             }
 
@@ -216,7 +253,7 @@ static unsigned long findMem(unsigned long max)
 
         pokeIW(0,v0);
         pokeIW(1,v1);
-        //dbgprintf("iwmem[d] = 0x%08x : %d\r\n", iwMem[b], (iwMem[b]-ba) / 1024);
+        //dbgprintf("iwmem[d] = 0x%08x : %d", iwMem[b], (iwMem[b]-ba) / 1024);
         iwMem[b]-=ba;
     }
     return fnd;
@@ -224,23 +261,27 @@ static unsigned long findMem(unsigned long max)
 
 static char testPort(unsigned short port)
 {
-    iwPort=port;
-
+    uint16 oldport = iwPort;
+    iwPort = port;
     resetIW();
     char v0=peekIW(0);
     char v1=peekIW(1);
+
     pokeIW(0,0xAA);
     pokeIW(1,0x55);
 
     char iw=(peekIW(0)==0xAA);
+
     pokeIW(0,v0);
     pokeIW(1,v1);
 
     if (!iw) {
         dbgprintf("iw test 1 failed");
+        iwPort = oldport;
         return 0;
     }
 
+/*
     outwIW(0x43, 0);
     outIW(0x44, 0);
     outwIW(0x51, 0x1234);
@@ -249,85 +290,128 @@ static char testPort(unsigned short port)
         dbgprintf("iw test 2 failed");
         iw=0;
     }
-
     pokeIW(0,v0);
     pokeIW(1,v1);
     if (!iw) {
+        iwPort = oldport;
         return 0;
     }
+*/
 
     if (!setenhmode(1)) {
-        return 0;
-    }
+        iwType = GUSTYPE_GF1;
 
-    outwIW(0x52,(inwIW(0x52)&0xFFF0)|0x0c);
-    outIW(0x53,inIW(0x53)&0xFD);
-
-    unsigned long realmem=findMem(0x1000000);
-    //dbgprintf("realmem = %d kb [%d][%d][%d][%d]\r\n", realmem / 1024, iwMem[0]/1024, iwMem[1]/1024, iwMem[2]/1024, iwMem[3]/1024);
-
-    unsigned long memcfg=(iwMem[3]>>18);
-    memcfg=(memcfg<<8)|(iwMem[2]>>18);
-    memcfg=(memcfg<<8)|(iwMem[1]>>18);
-    memcfg=(memcfg<<8)|(iwMem[0]>>18);
-    char lmcfi;
-
-    switch (memcfg)
-    {
-    case 0x00000001:
-        lmcfi=0x0; break;
-    case 0x00000101: case 0x00010101:
-        lmcfi=0x1; break;
-    case 0x01010101:
-        lmcfi=0x2; break;
-    case 0x00000401:
-        lmcfi=0x3; break;
-    case 0x00010401: case 0x00040401: case 0x01040401: case 0x04040401:
-        lmcfi=0x4; break;
-    case 0x00040101:
-        lmcfi=0x5; break;
-    case 0x01040101: case 0x04040101:
-        lmcfi=0x6; break;
-    case 0x00000004:
-        lmcfi=0x7; break;
-    case 0x00000104: case 0x00000404:
-        lmcfi=0x8; break;
-    case 0x00010404: case 0x00040404: case 0x01040404: case 0x04040404:
-        lmcfi=0x9; break;
-    case 0x00000010:
-        lmcfi=0xA; break;
-    case 0x00000110: case 0x00000410: case 0x00001010:
-        lmcfi=0xB; break;
-    default:
-        lmcfi=0xC;
-    }
-
-    outwIW(0x52,(inwIW(0x52)&0xFFF0)|lmcfi);
-    findMem(realmem);
-
-    unsigned long maxsize=4096*1024;
-    for (int b=1; b<4; b++) {
-        if (iwMem[b]&&iwMem[b]<maxsize) {
-            maxsize=iwMem[b];
-            bufferbank=b;
+        int i,j;
+        unsigned char oldmem[4];
+        for (i=0; i<4; i++) {
+            oldmem[i]=peekIW(i*256*1024);
         }
+        pokeIW(0,1);
+        pokeIW(0,1);
+        iwMem[0]=256*1024;
+        iwMem[1]=0;
+        iwMem[2]=0;
+        iwMem[3]=0;
+        for (i=1; i<4; i++) {
+            pokeIW(i*256*1024, 15+i);
+            pokeIW(i*256*1024, 15+i);
+            for (j=0; j<i; j++)
+            {
+                if (peekIW(j*256*1024)!=(1+j))
+                    break;
+                if (peekIW(j*256*1024)!=(1+j))
+                    break;
+            }
+            if (j!=i)
+                break;
+            if (peekIW(i*256*1024)!=(15+i))
+                break;
+            if (peekIW(i*256*1024)!=(15+i))
+                break;
+            pokeIW(i*256*1024, 1+i);
+            pokeIW(i*256*1024, 1+i);
+            iwMem[0]+=256*1024;
+        }
+        for (i=3; i>=0; i--) {
+            pokeIW(i*256*1024, oldmem[i]);
+            pokeIW(i*256*1024, oldmem[i]);
+        }
+        iwRev = 1;
+        memsize=iwMem[0]+iwMem[1]+iwMem[2]+iwMem[3];
+        return 1;
     }
+    else {
+        iwType = GUSTYPE_AMD;
+        outwIW(0x52,(inwIW(0x52)&0xFFF0)|0x0c);
+        outIW(0x53,inIW(0x53)&0xFD);
 
-    if (iweffects) {
-        iwMem[bufferbank]-=FXBUFFERSIZE;
+        unsigned long realmem=findMemAMD(0x1000000);
+        //dbgprintf("realmem = %d kb [%d][%d][%d][%d]", realmem / 1024, iwMem[0]/1024, iwMem[1]/1024, iwMem[2]/1024, iwMem[3]/1024);
+
+        unsigned long memcfg=(iwMem[3]>>18);
+        memcfg=(memcfg<<8)|(iwMem[2]>>18);
+        memcfg=(memcfg<<8)|(iwMem[1]>>18);
+        memcfg=(memcfg<<8)|(iwMem[0]>>18);
+        char lmcfi;
+
+        switch (memcfg)
+        {
+        case 0x00000001:
+            lmcfi=0x0; break;
+        case 0x00000101: case 0x00010101:
+            lmcfi=0x1; break;
+        case 0x01010101:
+            lmcfi=0x2; break;
+        case 0x00000401:
+            lmcfi=0x3; break;
+        case 0x00010401: case 0x00040401: case 0x01040401: case 0x04040401:
+            lmcfi=0x4; break;
+        case 0x00040101:
+            lmcfi=0x5; break;
+        case 0x01040101: case 0x04040101:
+            lmcfi=0x6; break;
+        case 0x00000004:
+            lmcfi=0x7; break;
+        case 0x00000104: case 0x00000404:
+            lmcfi=0x8; break;
+        case 0x00010404: case 0x00040404: case 0x01040404: case 0x04040404:
+            lmcfi=0x9; break;
+        case 0x00000010:
+            lmcfi=0xA; break;
+        case 0x00000110: case 0x00000410: case 0x00001010:
+            lmcfi=0xB; break;
+        default:
+            lmcfi=0xC;
+        }
+
+        outwIW(0x52,(inwIW(0x52)&0xFFF0)|lmcfi);
+        findMemAMD(realmem);
+
+        unsigned long maxsize=4096*1024;
+        for (int b=1; b<4; b++) {
+            if (iwMem[b]&&iwMem[b]<maxsize) {
+                maxsize=iwMem[b];
+                bufferbank=b;
+            }
+        }
+
+        if (iweffects) {
+            iwMem[bufferbank]-=FXBUFFERSIZE;
+        }
+
+        bufferpos=iwMem[bufferbank]>>1;
+        memsize=iwMem[0]+iwMem[1]+iwMem[2]+iwMem[3];
+        //dbgprintf("memsize = %d kb", memsize / 1024);
+
+        iwRev=inIW(0x5b)>>4;
+        setenhmode(0);
+        return 1;
     }
-
-    bufferpos=iwMem[bufferbank]>>1;
-    memsize=iwMem[0]+iwMem[1]+iwMem[2]+iwMem[3];
-    //dbgprintf("memsize = %d kb\r\n", memsize / 1024);
-
-    iwRev=inIW(0x5b)>>4;
-    setenhmode(0);
-    return 1;
 }
 
 void dofill(unsigned long iwpos, unsigned long maxlen, unsigned short port)
 {
+    // only used on amd
     dbgprintf("dofill %08x %d %04x", (unsigned int)iwpos, (unsigned int)maxlen, (unsigned int)port);
     outp(iwPort+0x103, 0x44);
     outp(iwPort+0x105, (iwpos>>16));
@@ -340,38 +424,11 @@ void dofill(unsigned long iwpos, unsigned long maxlen, unsigned short port)
         iwpos += 2;
     }
 }
-/*
-#pragma aux dofill parm [ebx] [ecx] [edx] modify [eax] = \
-  "pushf" \
-  "cli" \
-  "add dx,103h" \
-  "mov al,44h" \
-  "out dx,al" \
-  "add dx,2" \
-  "mov eax,ebx" \
-  "shr eax,16" \
-  "out dx,al" \
-  "sub dx,2" \
-  "mov al,43h" \
-  "out dx,al" \
-  "inc dx" \
-  "shr ecx,1" \
-  "adc ecx,0" \
-  "mov ax,bx" \
-  "out dx,ax" \
-  "dec dx" \
-  "mov al,51h" \
-  "out dx,ax" \
-  "inc dx" \
-  "mov ax,0" \
-"lp:" \
-  "out dx,ax" \
-  "loop lp" \
-  "popf"
-*/
+
 
 static void FillIWMem(unsigned long pos, unsigned long len)
 {
+    // only used on amd
     unsigned char lmci=inIW(0x53);
     outIW(0x53,(lmci|0x01)&0x4D);
     dofill(pos,len,iwPort);
@@ -381,8 +438,10 @@ static void FillIWMem(unsigned long pos, unsigned long len)
 
 static void SetupReverb()
 {
+    if (iwType == GUSTYPE_GF1) {
+        return;
+    }
     FillIWMem((bufferbank<<22)+(bufferpos<<1),FXBUFFERSIZE);
-
     unsigned long actpos=((bufferbank&0x01)<<21)|bufferpos;
     for (int i=28; i<32; i++) {
         int rc=i-28;
@@ -416,6 +475,11 @@ static void initiw(char enhmode,char chans)
 {
     int i;
 
+    if (iwType == GUSTYPE_GF1) {
+        enhmode = 0;
+        chans = chans < 14 ? 14 : chans;
+    }
+
     if (chans>32) {
         chans=32;
     }
@@ -424,6 +488,8 @@ static void initiw(char enhmode,char chans)
         chans=28;
     }
 
+    activechans = chans;
+
     resetIW();
     setenhmode(enhmode);
 
@@ -431,7 +497,11 @@ static void initiw(char enhmode,char chans)
     outIW(0x45, 0x00);
     outIW(0x49, 0x00);
 
-    outIW(0xE, 0xff);  // only for GUS compatibility
+    if (iwType == GUSTYPE_AMD) {
+        outIW(0xE, 0xff);  // only for GUS compatibility
+    } else {
+        outIW(0xE, (chans-1)|0xC0);
+    }
 
     inpIW(0x6);
     inIW(0x41);
@@ -445,34 +515,45 @@ static void initiw(char enhmode,char chans)
         setmode(3);  // stop voice
         setvmode(3);  // stop volume
         setpoint(0,0);
-        setpoint(1,0);
-        outIW(0x06,63);
-        outwIW(0x0C,0xfff0); // reset panning
-
-        if (enhmode) {
-            outIW(0x15,(i<chans)?0x20:0x02);   // fine panning vs. voice off
-            setbank(0);
-            outwIW(0x13,0xfff0);                // reset vol offsets
-            outwIW(0x1b,0xfff0);
-            outwIW(0x1c,0xfff0);
-            outwIW(0x16,0);                     // reset effects depth
-            outwIW(0x1d,0);
-            outIW(0x14,0x00);                        // disable FX channels;
+        if (iwType == GUSTYPE_AMD) {
+            setpoint(1,0);
         }
-        else {
-            outIW(0x15,0x00);
+        outIW(0x06,63);
+        delayIW(10);
+
+        if (iwType == GUSTYPE_AMD) {
+            outwIW(0x0C,0xfff0); // reset panning
+
+            if (enhmode) {
+                outIW(0x15,(i<chans)?0x20:0x02);   // fine panning vs. voice off
+                setbank(0);
+                outwIW(0x13,0xfff0);                // reset vol offsets
+                outwIW(0x1b,0xfff0);
+                outwIW(0x1c,0xfff0);
+                outwIW(0x16,0);                     // reset effects depth
+                outwIW(0x1d,0);
+                outIW(0x14,0x00);                        // disable FX channels;
+            }
+            else {
+                outIW(0x15,0x00);
+            }
         }
     }
 
+    inpIW(0x6);
+    inIW(0x41);
+    inIW(0x49);
+    inIW(0x8F);
+
     outIW(0x4C,0x07);             // synth irq enable, dac enable
 
-    if (iweffects&&enhmode&&chans&&chans<29) {
+    if ((iwType==GUSTYPE_AMD)&&iweffects&&enhmode&&chans&&chans<29) {
         SetupReverb();
     }
 
     selvoc(0);
     outpIW(0x00,0x08);            // irqdma enable, mic off, lineout on, linein on
-
+    selvoc(0);
     //outpIW(0x00,0x0);
 }
 
@@ -641,7 +722,14 @@ static void processtick()
                 iwsample *s=&samples[c->nextsample];
                 unsigned char bit16=!!(s->type&mcpSamp16Bit);
                 c->bank=s->bank;
-                c->startpos=(s->pos+(s->bank<<22))>>bit16;
+                c->startpos=(s->pos+(s->bank<<22));
+                if (iwType == GUSTYPE_AMD) {
+                    c->startpos >>= bit16;
+                } else if (bit16) {
+                    c->startpos=(c->startpos&0xC0000)|((c->startpos>>1)&0x1FFFF)|0x20000;
+                    c->curloop=10;
+                }
+
                 c->endpos=c->startpos+s->length;
                 c->loopstart=c->startpos+s->loopstart;
                 c->loopend=c->startpos+s->loopend;
@@ -737,16 +825,25 @@ static void processtick()
             }
 
             if (!(getmode()&1)) {
-                if (c->pause) {
-                    fadevoldown();
+                if (iwType == GUSTYPE_AMD) {
+                    if (c->pause) {
+                        fadevoldown();
+                    } else {
+                        fadevol(linvol[c->volume]);
+                        setrelvoll(c->voll,0);
+                        setrelvolr(c->volr,0);
+                        seteffvol(linvol[c->reverb]);
+                        seteffchan(pan2chan[c->fxsend]);
+                    }
+                    setfreq(umuldivrnd(c->orgfreq, c->samprate*masterfreq, c->orgdiv)/11025);
                 } else {
-                    fadevol(linvol[c->volume]);
-                    setrelvoll(c->voll,0);
-                    setrelvolr(c->volr,0);
-                    seteffvol(linvol[c->reverb]);
-                    seteffchan(pan2chan[c->fxsend]);
+                    int v = c->voll + c->volr;
+                    if (v) {
+                        setpan((15*c->volr+v/2)/v);
+                    }
+                    fadevol(c->pause?0:linvol[v]);
+                    setfreq(umuldivrnd(umuldivrnd(c->orgfreq, c->samprate*masterfreq, c->orgdiv), activechans, 154350));
                 }
-                setfreq(umuldivrnd(c->orgfreq, c->samprate*masterfreq, c->orgdiv)/11025);
             } else {
                 fadevoldown();
             }
@@ -764,101 +861,68 @@ static void processtick()
 
 void doupload8(const void *buf, unsigned long iwpos, unsigned long maxlen, unsigned short port)
 {
-    outp(port+0x103, 0x44);
-    outp(port+0x105, (iwpos>>16));
-    outp(port+0x103, 0x43);
-    outpw(port+0x104, (iwpos & 0xffff));
-
-    outp(port+0x103, 0x51);
-    unsigned short* ptr = (unsigned short*)buf;
-    unsigned long end = iwpos + maxlen;
-    while (iwpos < end) {
-        unsigned short v = *ptr++;
-        //swap16(&v);
-        outpw(port+0x104, v);
-        iwpos += 2;
+    // onl used on amd
+    if (iwType == GUSTYPE_AMD) {
+        outp(port+0x103, 0x44);                 // hi byte address
+        outp(port+0x105, (iwpos>>16));
+        outp(port+0x103, 0x43);                 // lo word address
+        outpw(port+0x104, (iwpos & 0xffff));
+        outp(port+0x103, 0x51);                 // auto incrementing writes
+        unsigned short* ptr = (unsigned short*)buf;
+        unsigned short* end = (unsigned short*)((unsigned long)buf + maxlen);
+        while (ptr < end) {
+            outpw(port+0x104, *ptr++);          // write word
+        }
     }
 }
 #define doupload16 doupload8
 
-/*
-#pragma aux doupload8 parm [esi] [ebx] [ecx] [edx] modify [eax] = \
-  "pushf" \
-  "cli" \
-  "add dx,103h" \
-  "mov al,44h" \
-  "out dx,al" \
-  "add dx,2" \
-  "mov eax,ebx" \
-  "shr eax,16" \
-  "out dx,al" \
-  "sub dx,2" \
-  "mov al,43h" \
-  "out dx,al" \
-  "inc dx" \
-  "shr ecx,1" \
-  "adc ecx,0" \
-  "mov ax,bx" \
-  "out dx,ax" \
-  "dec dx" \
-  "mov al,51h" \
-  "out dx,ax" \
-  "inc dx" \
-  "rep outsw" \
-  "popf"
-*/
-/*
-void doupload16(const void *buf, unsigned long iwpos, unsigned long maxlen, unsigned short port)
-{
-}
-*/
-/*
-#pragma aux doupload16 parm [esi] [ebx] [ecx] [edx] modify [eax] = \
-  "pushf" \
-  "cli" \
-  "add dx,103h" \
-  "mov al,44h" \
-  "out dx,al" \
-  "add dx,2" \
-  "mov eax,ebx" \
-  "shr eax,16" \
-  "out dx,al" \
-  "sub dx,2" \
-  "mov al,43h" \
-  "out dx,al" \
-  "inc dx" \
-  "shr ecx,1" \
-  "mov ax,bx" \
-  "out dx,ax" \
-  "dec dx" \
-  "mov al,51h" \
-  "out dx,ax" \
-  "inc dx" \
-  "rep outsw" \
-  "popf"
-*/
-
 static void slowupload()
 {
-    unsigned char lmci=inIW(0x53);
-    outIW(0x53,(lmci|0x01)&0x4D);
-
-    if (dma16bit) {
-        doupload16(dmaxfer, dmapos, dmaleft, iwPort);
+    if (iwType == GUSTYPE_AMD) {
+        unsigned char lmci=inIW(0x53);
+        outIW(0x53,(lmci|0x01)&0x4D);           // enable auto increment
+        if (dma16bit) {
+            doupload16(dmaxfer, dmapos, dmaleft, iwPort);
+        } else {
+            if ((dmapos&1)&&dmaleft) {
+                pokeIW(dmapos, *(char*)dmaxfer);
+                dmaxfer=(char*)dmaxfer+1;
+                dmapos++;
+                dmaleft--;
+            }
+            if (dmaleft&1) {
+                pokeIW(dmapos+dmaleft-1, ((char*)dmaxfer)[dmaleft-1]);
+                dmaleft--;
+            }
+            doupload8(dmaxfer, dmapos, dmaleft, iwPort);
+        }
+        outIW(0x53,lmci);                       // disable auto increment
     } else {
-        if ((dmapos&1)&&dmaleft) {
-            pokeIW(dmapos, *(char*)dmaxfer);
-            dmaxfer=(char*)dmaxfer+1;
-            dmapos++;
-            dmaleft--;
+        unsigned char* ptr = (unsigned char*)dmaxfer;
+        unsigned char* end = ptr + dmaleft;
+
+        uint8  ah = (dmapos >> 16) & 0xff;
+        uint16 al = (dmapos & 0xffff);
+
+        outp( iwPort + 0x103, 0x44);            // hi byte address
+        outp( iwPort + 0x105, ah);
+        outp( iwPort + 0x103, 0x43);            // lo word address
+        outpw(iwPort + 0x104, al);
+
+        while (ptr != end) {
+            outp(iwPort + 0x107, *ptr);         // write byte
+            al++;
+            outpw(iwPort + 0x104, al);          // update lo word address
+            if (al == 0) {
+                ah++;
+                outp(iwPort + 0x103, 0x44);     // update hi byte address
+                outp(iwPort + 0x105, ah);
+                outp(iwPort + 0x103, 0x43);     // back to lo word address
+            }
+            ptr++;
         }
-        if (dmaleft&1) {
-            pokeIW(dmapos+dmaleft-1, ((char*)dmaxfer)[dmaleft-1]);
-            dmaleft--;
-        }
-        doupload8(dmaxfer, dmapos, dmaleft, iwPort);
     }
-    outIW(0x53,lmci);
 }
 
 static void irqrout()
@@ -945,6 +1009,9 @@ static void voidtimer()
 
 static void calcfxvols()
 {
+    if (iwType == GUSTYPE_GF1) {
+        return;
+    }
     short vl,vr;
     if (channelnum<29) {
         for (int i=28; i<32; i++) {
@@ -966,37 +1033,57 @@ static void calcfxvols()
 
 static void calcvols(iwchan *c)
 {
-    short cv=(c->orgvol*mastervol*amplify)>>20;
-    if (cv>=0x200) {
-        cv=0x1ff;
-    }
-
-    short vr=(((c->orgpan*masterpan)>>6)+128)<<1;
-    if (vr>=0x200) {
-        vr=0x1ff;
-    }
-
-    short vl=0x1ff-vr;
-    char  ch=vr>>8;
-
-    short rv;
-    if (masterreverb>0) {
-        rv=((masterreverb<<2)+((c->orgrev*(64-masterreverb))>>6));
-    } else {
-        rv=(c->orgrev*(masterreverb+64))>>6;
-    }
-
-    if (rv>=0x200) {
-        rv=0x1ff;
-    }
-
-    if (masterbal)
-    {
-        if (masterbal<0) {
-            vr=(vr*(64+masterbal))>>6;
-        } else {
-            vl=(vl*(64-masterbal))>>6;
+    short cv,vl,vr,rv; char ch;
+    if (iwType == GUSTYPE_AMD) {
+        cv=(c->orgvol*mastervol*amplify)>>20;
+        if (cv>=0x200) {
+            cv=0x1ff;
         }
+
+        vr=(((c->orgpan*masterpan)>>6)+128)<<1;
+        if (vr>=0x200) {
+            vr=0x1ff;
+        }
+
+        vl=0x1ff-vr;
+        ch=vr>>8;
+
+        if (masterreverb>0) {
+            rv=((masterreverb<<2)+((c->orgrev*(64-masterreverb))>>6));
+        } else {
+            rv=(c->orgrev*(masterreverb+64))>>6;
+        }
+
+        if (rv>=0x200) {
+            rv=0x1ff;
+        }
+
+        if (masterbal)
+        {
+            if (masterbal<0) {
+                vr=(vr*(64+masterbal))>>6;
+            } else {
+                vl=(vl*(64-masterbal))>>6;
+            }
+        }
+    } else {
+        vl=(c->orgvol*mastervol*amplify)>>20;
+        if (vl>=0x200) {
+            vl=0x1ff;
+        }
+        vr=(vl*(((c->orgpan*masterpan)>>6)+128))>>8;
+        vl-=vr;
+
+        if (masterbal) {
+            if (masterbal<0)
+                vr=(vr*(64+masterbal))>>6;
+            else
+                vl=(vl*(64-masterbal))>>6;
+        }
+
+        cv=vl+vr;
+        rv=0;
+        ch=0;
     }
 
     c->volume=cv;
@@ -1006,12 +1093,60 @@ static void calcvols(iwchan *c)
     c->fxsend=ch;
 }
 
+
+static int LoadSamplesGF1(sampleinfo *sil, int n)
+{
+  dbgprintf("LoadSamplesGF1 %d", n);
+  if (n>MAXSAMPLES)
+    return 0;
+  if (!mcpReduceSamples(sil, n, iwMem[0], mcpRedGUS|mcpRedToMono))
+    return 0;
+  mempos[0]=0; mempos[1]=0; mempos[2]=0; mempos[3]=0;
+  for (int i=0; i<(2*n); i++)
+  {
+    sampleinfo *si=&sil[i%n];
+    if ((!!(si->type&mcpSamp16Bit))^(i<n))
+      continue;
+    iwsample *s=&samples[i%n];
+    s->pos=mempos[0];
+    s->length=si->length;
+    s->loopstart=si->loopstart;
+    s->loopend=si->loopend;
+    s->sloopstart=si->sloopstart;
+    s->sloopend=si->sloopend;
+    s->samprate=si->samprate;
+    s->type=si->type;
+    s->redlev=(si->type&mcpSampRedRate4)?2:(si->type&mcpSampRedRate2)?1:0;
+    int bit16=!!(si->type&mcpSamp16Bit);
+    s->bank = 0;
+    mempos[0]+=(s->length+2)<<bit16;
+    if (s->loopstart==s->loopend)
+      s->type&=~mcpSampLoop;
+    dma16bit=bit16;
+    dmaleft=(s->length+2)<<dma16bit;
+    dmaxfer=si->ptr;
+    dmapos=s->pos;
+    short sr = _disableint();
+    slowupload();
+    _restoreint(sr);
+    s->ptr = si->ptr;
+  }
+
+  samplenum=n;
+  for (int i=0; i<n; i++)
+    samples[i].ptr=sil[i].ptr;
+
+  return 1;
+}
+
+
 static int LoadSamples(sampleinfo *sil, int n)
 {
+    if (iwType == GUSTYPE_GF1) {
+        return LoadSamplesGF1(sil, n);
+    }
+    dbgprintf("LoadSamples %d", n);
     unsigned long samplen[MAXSAMPLES];
-
-    dbgprintf("LoadSamples %d\r\n", n);
-
     if (n>MAXSAMPLES) {
         return 0;
     }
@@ -1028,7 +1163,7 @@ static int LoadSamples(sampleinfo *sil, int n)
     }
 
     if (!mcpReduceSamples(sil, n, memsize-samplen[largestsample], mcpRedToMono)) {
-        dbgprintf("reduce %d fail\r\n", n);
+        dbgprintf("reduce %d fail", n);
         return 0;
     }
 
@@ -1087,6 +1222,7 @@ static int LoadSamples(sampleinfo *sil, int n)
     return 1;
 }
 
+
 static void recalcvols()
 {
     for (int i=0; i<channelnum; i++) {
@@ -1101,7 +1237,10 @@ static void GetMixChannel(int ch, mixchannel *chn, int rate)
 
     //unsigned short is=_disableint();
     selvoc(ch);
-    unsigned long pos=getpoint()+(getbank()<<22);
+    unsigned long pos=getpoint();
+    if (iwType == GUSTYPE_AMD) {
+        pos += getbank() << 22;
+    }
     unsigned char mode=getmode();
     //_restoreint(is);
     iwchan *c=&channels[ch];
@@ -1115,10 +1254,23 @@ static void GetMixChannel(int ch, mixchannel *chn, int rate)
     }
 
     unsigned int resvoll,resvolr;
-    resvoll=c->volume*c->voll; resvolr=c->volume*c->volr;
+    resvoll=c->volume*c->voll;
+    resvolr=c->volume*c->volr;
     chn->vols[0]=resvoll*8/amplify;
     chn->vols[1]=resvolr*8/amplify;
+
+/* todo_gf1
+        resvoll=c.voll;
+        resvolr=c.volr;
+        chn.vols[0]=resvoll*4096/amplify;
+        chn.vols[1]=resvolr*4096/amplify;
+*/
     chn->status|=((mode&0x08)?MIX_LOOPED:0)|((mode&0x10)?MIX_PINGPONGLOOP:0)|((mode&0x04)?MIX_PLAY16BIT:0);
+
+/* todo_ gf1
+        if (c.orgdiv && rate)
+            chn.step=umuldivrnd(umuldivrnd(umuldivrnd(c.orgfreq, masterfreq, 256), c.samprate, c.orgdiv), 1<<16, rate);
+*/
 
     if (c->orgdiv) {
         chn->step=umuldivrnd(umuldivrnd(c->orgfreq, c->samprate*masterfreq, c->orgdiv), 256, rate);
@@ -1136,6 +1288,10 @@ static void GetMixChannel(int ch, mixchannel *chn, int rate)
     chn->loopend=c->curend-c->startpos;
     chn->fpos=0;
     chn->pos=pos-c->startpos;
+/* todo_gf1
+        chn.fpos=pos<<7;
+        chn.pos=((pos>>9)&0xFFFFF)-c.startpos;
+*/    
     if (filter) {
         chn->status|=MIX_INTERPOLATE;
     }
@@ -1150,9 +1306,9 @@ static void Pause(int p)
 
     if (paused) {
         for (int i=0; i<channelnum; i++) {
-        if (channels[i].wasplaying) {
-            selvoc(i);
-            setmode(channels[i].mode|(getmode()&0x40));
+            if (channels[i].wasplaying) {
+                selvoc(i);
+                setmode(channels[i].mode|(getmode()&0x40));
             }
         }
         stimerpos=0;
@@ -1322,7 +1478,9 @@ static int OpenPlayer(int chan, void (*proc)())
     channelnum=chan;
 
     selvoc(0);
+    delayIW(10);
     outpIW(0x00,0x09);
+    delayIW(10);
 
     cmdtimerpos=0;
     if (useiwtimer && irqInit(iwIRQ, irqrout, 1, 8192)) {
@@ -1363,8 +1521,13 @@ static void ClosePlayer()
 static int initu(const deviceinfo *c)
 {
     useiwtimer=(c->irq!=-1)&&(c->opt&0x01);
-    iweffects=(c->opt&0x02);
-    forceeffects=(c->opt&0x04);
+    if (iwType == GUSTYPE_AMD) {
+        iweffects=(c->opt&0x02);
+        forceeffects=(c->opt&0x04);
+    } else {
+        iweffects = 0;
+        forceeffects = 0;
+    }
 
     if (!testPort(c->port)) {
         return 0;
@@ -1419,14 +1582,20 @@ static int detectu(deviceinfo *c)
 {
     dbgprintf("detectu");
 
+    c->opt = 0;
+    c->opt |= 0x01;         // use ultrasound timer irq when possible
+    c->opt |= 0x02;         // use interwave effects when possible
+
     iwPort =  0;
     iwIRQ  = -1;
-    iwRev  = -1;
+    iwRev  =  1;
+    iwType =  GUSTYPE_AMD;
 
     // ask isa_bios
     uint16 port_pnp = mxIsaPort("GRV0000", 0, 0, 0);
     uint16 port_min = port_pnp ? port_pnp : 0x220;
     uint16 port_max = port_pnp ? port_pnp : 0x260;
+    uint16 port_found = 0;
 
     // probe the bus for a GUS-like card
     dbgprintf("Looking for GUS at: 0x%03x-0x%03x", port_min, port_max);
@@ -1445,12 +1614,6 @@ static int detectu(deviceinfo *c)
 
     uint8 irq_pnp = mxIsaIrq("GRV0000", 0, 0, 0);
     iwIRQ = irq_pnp ? irq_pnp : -1;
-    iweffects=(c->opt&0x02);
-
-    c->opt = 0;
-    c->opt |= 0x01;         // use ultrasound timer irq when possible
-    c->opt |= 0x02;         // use interwave effects
-
     c->dev=&mcpInterWave;
     c->port=iwPort;
     c->port2=-1;
@@ -1462,7 +1625,8 @@ static int detectu(deviceinfo *c)
     c->chan=32;
     c->mem=memsize;
 
-    dbgprintf("GUS Rev.%d %d%s at port 0x%03x irq %d",
+    dbgprintf("GUS %s Rev.%d %d%s at port 0x%03x irq %d",
+        (iwType == GUSTYPE_AMD) ? "AMD" : "GF1",
         (int) c->subtype,
         c->mem >= (1024*1024UL) ? (int) (c->mem / (1024*1024UL)) : (int) (c->mem / 1024),
         c->mem >= (1024*1024UL) ? "MB" : "KB",

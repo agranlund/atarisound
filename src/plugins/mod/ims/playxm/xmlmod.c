@@ -337,7 +337,7 @@ static int loadmod(xmodule *m, binfile *file, int chan, int sig, int opt)
       return errAllocMem;
     memset(sip->ptr, 0, sip->length);
     bf_read(file, sip->ptr, sip->length);
-    //dbgprintf("sample %04x : %d : %d\r\n", sip->type, sip->samprate, sip->length);
+    //dbgprintf("sample %04x : %d : %d", sip->type, sip->samprate, sip->length);
     sp->handle=i;
   }
 

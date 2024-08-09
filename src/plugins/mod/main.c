@@ -102,8 +102,6 @@ static bool songLoad(uint8* buf, uint32 siz) {
         xmpLoad = xmpLoadMOD;
     }
 
-    dbgprintf("buf: %02x %02x %02x %02x", buf[44], buf[45], buf[46], buf[47]);
-
     if (playType == PLAYTYPE_XMP) {
         if (xmpLoad == null) {
             err("xmpLoad");

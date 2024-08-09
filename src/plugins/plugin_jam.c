@@ -34,6 +34,7 @@ extern uint32 jamHookNextSong;
 
 static uint8* songData = 0;
 static jamSongInfo* songInfo = 0;
+static bool ignoreLoad = true;
 
 extern void jamCallHookNextSong();
 extern void jamCallHookLog(char* msg);
@@ -47,6 +48,7 @@ void jamInitLib()
     songData = 0;
     songInfo = 0;
     jamLibInited = 1;
+    ignoreLoad = true;
 }
 
 //-------------------------------------------------------------
@@ -104,37 +106,56 @@ uint32 jamMessageHandler(int32 param, int32 msg, void* data2, void* data1)
     {
           case JAM_INFO:
         {
+            dbg("JAM_INFO");
             return (uint32) jamOnPluginInfo();
         } break;
 
           case JAM_INIT:
         {
+            dbg("JAM_INIT");
             jamInitLib();
         } break;
 
           case JAM_ACTIVATE:
         {
+            dbg("JAM_ACTIVATE");
             jamOnPluginStart();
         } break;
 
           case JAM_SONGSELECT:
         {
-            // data1 = pointer to the file content
+            // data1 is a pointer to file contents
+            dbg("JAM_SONGSELECT: %x", data1);
+#if 0
             songData = (uint8*) data1;
             jamOnLoad(songData);
+#endif
+
         } break;
 
           case JAM_SONGINFO:
         {
-            // data1, data2
             // data1 is pointer to song info struct
             // data2 is same as JAM_SONGSELECT:data1 (file content)
+            dbg("JAM_SONGINFO: %08x %08x", data1, data2);
+#if 1            
+            if (data2) {
+                songData = (uint8*) data2;
+                jamOnLoad(songData);
+            }
             songInfo = (jamSongInfo*) data1;
             jamOnInfo(songInfo);
+#else            
+            if (data1) {
+                songInfo = (jamSongInfo*) data1;
+                jamOnInfo(songInfo);
+            }
+#endif            
         } break;
 
           case JAM_PLAY:
         {
+            dbg("JAM_PLAY: %08x %08x", songData, songInfo);
             if (songData && songInfo) {
                 jamOnPlay();
             }
@@ -142,16 +163,19 @@ uint32 jamMessageHandler(int32 param, int32 msg, void* data2, void* data1)
 
           case JAM_STOP:
         {
+            dbg("JAM_STOP");
             jamOnStop();
         } break;
 
           case JAM_DEACTIVATE:
         {
+            dbg("JAM_DEACTIVATE");
             jamOnPluginStop();
         } break;
 
           case JAM_DEINIT:
         {
+            dbg("JAM_DEINIT");
             //jamReleaseLib();
         } break;
 

@@ -50,9 +50,9 @@ static bool pluginInit() {
     }
 
     uint16 ioport = 0;
-    ioport = ioport ? ioport : mxIsaPort("PNPB020", 0, 0);    // opl3 compatible
-    ioport = ioport ? ioport : mxIsaPort("PNPB005", 0, 0);    // opl2 compatible
-    ioport = ioport ? ioport : 0x388;                         // default oplx port
+    ioport = ioport ? ioport : mxIsaPort("PNPB020", 0, 0, 0);    // opl3 compatible
+    ioport = ioport ? ioport : mxIsaPort("PNPB005", 0, 0, 0);    // opl2 compatible
+    ioport = ioport ? ioport : 0x388;                            // default oplx port
     return (vgmslap_init(iobase, ioport) == 0);
 }
 
@@ -337,10 +337,12 @@ void jamOnPluginStop() {
 }
 
 void jamOnLoad(uint8* songData) {
+    dbg("jamOnLoad %x", songData);
     songLoad(songData);
 }
 
 void jamOnInfo(jamSongInfo* songInfo) {
+    dbg("jamOnInfo %x", songInfo);
     songInfo->isYMsong = 1;
     songInfo->songCount = 0;
     if (currentSongPtr) {
@@ -352,10 +354,12 @@ void jamOnInfo(jamSongInfo* songInfo) {
 }
 
 void jamOnPlay() {
+    dbg("jamOnPlay %x", currentSongPtr);
     songRestart();
 }
 
 void jamOnStop() {
+    dbg("jamOnStop %x", currentSongPtr);
     if (currentSongPtr) {
         songStop();
     }

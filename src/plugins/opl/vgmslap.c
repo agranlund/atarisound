@@ -50,8 +50,8 @@ typedef short           wchar_t;
 #define prgstate_done       4
 
 
-#if 0
-#define dbgprintf(...)       printf(__VA_ARGS__)
+#if 1
+#define dbgprintf(...)       dbg(__VA_ARGS__)
 #else
 #define dbgprintf(...) {}
 #endif
@@ -127,6 +127,7 @@ static uint8_t vgmIdentifier[] = "Vgm ";			// VGM magic number
 static uint8_t gzMagicNumber[2] = {0x1F, 0x8B}; 	// GZ magic number
 static uint8_t* vgmFileData;
 static uint8_t* vgmFileBuffer;
+static uint32_t fileCursorStart = 0;
 static uint32_t fileCursorLocation = 0; 		// Stores where we are in the file.
 										// It's tracked manually to avoid expensive ftell calls when doing comparisons (for loops)
 
@@ -387,33 +388,38 @@ void vgmslap_pause(uint8_t pause)
 
 void vgmslap_play()
 {
-    dbgprintf("play : %d\r\n", programState);
-    if (programState == prgstate_stopped) {
+    dbgprintf("play : %d", programState);
+    if ((programState == prgstate_stopped) || (programState == prgstate_paused)) {
+        resetTimer();
 	    resetOPL();
         seekSet(currentVGMHeader.vgmDataOffset+0x34);
     	delay(100);
         if (detectedChip == 3 && vgmChipType == 5) {
             writeOPL(0x105,0x01);
         }
-        tickCounter = 0;
         programState = prgstate_playing;
+        loopCount = 0;
+        tickCounter = 0;
+        dataCurrentSample = 0;
         initTimer(playbackFrequency);
     }
 }
 
 void vgmslap_stop()
 {
-    dbgprintf("stop : %d\r\n", programState);
+    dbgprintf("stop : %d", programState);
     if (programState == prgstate_playing) {
         resetTimer();
         resetOPL();
+        loopCount = 0;
+        tickCounter = 0;
     }
     programState = prgstate_stopped;
 }
 
 uint8_t vgmslap_load(uint8_t* buf)
 {
-    dbgprintf("load : %d\r\n", programState);
+    dbgprintf("load : %d", programState);
     vgmslap_stop();
     programState = prgstate_null;
     if (buf == 0) {
@@ -466,10 +472,10 @@ void timerHandler(void)
 
 void initTimer(uint16_t frequency)
 {
-    dbgprintf("inittimer\r\n");
+    dbgprintf("inittimer");
     uint32_t hz = playbackFrequency / playbackFrequencyDivider;
     uint32_t hz_real = mxHookTimerA(timerHandler, hz);
-    dbgprintf("inittimer done\r\n");
+    dbgprintf("inittimer done");
     // todo: set tick stepper based on hz_real
 }
 
@@ -949,7 +955,8 @@ uint8_t loadVGM(uint8_t* buf)
 	
 	// Everything else is okay, I say it's time to load the GD3 tag!
 	populateCurrentGd3();
-	
+    fileCursorStart = fileCursorLocation;
+
 	// Success!
 	return 0;
 }

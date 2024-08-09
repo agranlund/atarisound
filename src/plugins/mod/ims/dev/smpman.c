@@ -738,7 +738,7 @@ int mcpReduceSamples(sampleinfo *si, int n, long mem, int opt)
   unsigned long memmax=mem;
   int samplenum=n;
 
-    dbg("mcpReduceSamples %d\r\n", n);
+    dbg("mcpReduceSamples %d", n);
 
   int i;
   for (i=0; i<samplenum; i++)

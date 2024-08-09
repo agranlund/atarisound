@@ -395,7 +395,7 @@ int xmpLoadModule(xmodule *m, binfile *file)
       if (!sip->ptr)
         return errAllocMem;
       bf_read(file, sip->ptr, l);
-      //dbgprintf("sample: %04x\r\n", sip->type);
+      //dbgprintf("sample: %04x", sip->type);
 #if 0
       if (sip->type & mcpSamp16Bit) {
         unsigned short* sd = (unsigned short*)sip->ptr;
