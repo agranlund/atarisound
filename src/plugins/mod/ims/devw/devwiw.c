@@ -74,6 +74,25 @@ static char rfxchans[4] = { 0xc0, 0xc0 ,0x30, 0x30};
 static int  rpanning[4] = {0x152, 0xAB,0x200,0x000};
 static char pan2chan[4] = { 0xA0, 0x30, 0x30, 0x50};
 
+
+static inline unsigned short _disableint() {
+    if (useiwtimer) {
+        // todo: only disable isa interrupt
+        return mxDisableInterrupts();
+    } else {
+        return mxDisableTimerA() ? 1 : 0;
+    }
+}
+
+static inline void _restoreint(unsigned short sr) {
+    if (useiwtimer) {
+        // todo: only restore isa interrupt
+        mxRestoreInterrupts(sr);
+    } else {
+        mxRestoreTimerA(sr);
+    }
+}
+
 static inline void delayIW(unsigned int len) {
     // len is number of ISA reads MS-DOS machine
 
@@ -346,7 +365,7 @@ static char testPort(unsigned short port)
         outIW(0x53,inIW(0x53)&0xFD);
 
         unsigned long realmem=findMemAMD(0x1000000);
-        //dbgprintf("realmem = %d kb [%d][%d][%d][%d]", realmem / 1024, iwMem[0]/1024, iwMem[1]/1024, iwMem[2]/1024, iwMem[3]/1024);
+        dbgprintf("realmem = %d kb [%d][%d][%d][%d]", realmem / 1024, iwMem[0]/1024, iwMem[1]/1024, iwMem[2]/1024, iwMem[3]/1024);
 
         unsigned long memcfg=(iwMem[3]>>18);
         memcfg=(memcfg<<8)|(iwMem[2]>>18);
@@ -401,7 +420,7 @@ static char testPort(unsigned short port)
 
         bufferpos=iwMem[bufferbank]>>1;
         memsize=iwMem[0]+iwMem[1]+iwMem[2]+iwMem[3];
-        //dbgprintf("memsize = %d kb", memsize / 1024);
+        dbgprintf("memsize = %d kb", memsize / 1024);
 
         iwRev=inIW(0x5b)>>4;
         setenhmode(0);
@@ -866,7 +885,7 @@ void doupload8(const void *buf, unsigned long iwpos, unsigned long maxlen, unsig
         outp(port+0x103, 0x44);                 // hi byte address
         outp(port+0x105, (iwpos>>16));
         outp(port+0x103, 0x43);                 // lo word address
-        outpw(port+0x104, (iwpos & 0xffff));
+        outpw(port+0x104, iwpos & 0xffff);
         outp(port+0x103, 0x51);                 // auto incrementing writes
         unsigned short* ptr = (unsigned short*)buf;
         unsigned short* end = (unsigned short*)((unsigned long)buf + maxlen);

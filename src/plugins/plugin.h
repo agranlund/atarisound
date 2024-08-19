@@ -41,12 +41,14 @@ extern volatile uint32 mxTimerALock;
 extern volatile uint32 mxTimerAOld;
 extern void mxTimerAVec();
 
-extern uint32 mxHookTimerA(void(*func)(void), uint32 hz);
-extern uint32 mxChangeTimerA(uint32 hz);
-extern void   mxUnhookTimerA();
+extern uint32   mxHookTimerA(void(*func)(void), uint32 hz);
+extern uint32   mxChangeTimerA(uint32 hz);
+extern void     mxUnhookTimerA();
+extern bool     mxDisableTimerA();
+extern void     mxRestoreTimerA(bool enable);
 
-extern bool   mxHookIsaInterrupt(void(*func)(void), uint16 inum);
-extern void   mxUnhookIsaInterrupt();
+extern bool     mxHookIsaInterrupt(void(*func)(void), uint16 inum);
+extern void     mxUnhookIsaInterrupt();
 
 extern void mxCalibrateDelay();
 extern void mxDelay(uint32 us);

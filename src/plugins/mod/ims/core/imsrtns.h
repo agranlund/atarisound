@@ -55,7 +55,7 @@ static inline unsigned long umuldivrnd(unsigned long eax, unsigned long edx, uns
     unsigned long ret = (unsigned long) (edx_eax / ecx);
     return ret;
 }
-
+/*
 static inline unsigned short _disableint() {
     return mxDisableInterrupts();
 }
@@ -63,6 +63,7 @@ static inline unsigned short _disableint() {
 static inline void _restoreint(unsigned short sr) {
     mxRestoreInterrupts(sr);
 }
+*/
 
 #else
 long imuldiv(long,long,long);

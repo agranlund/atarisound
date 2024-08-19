@@ -1,7 +1,7 @@
 #include <mint/osbind.h>
 #include <mint/cookie.h>
 #include "plugin.h"
-
+extern int mxTimerAVecLock();
 
 // ------------------------------------------------------------------------------------------
 static int mfpParamsFromHz(int32 hz, uint16* ctrl, uint16* data) {
@@ -32,7 +32,7 @@ static int mfpParamsFromHz(int32 hz, uint16* ctrl, uint16* data) {
 uint32 mxHookTimerA(void(*func)(void), uint32 hz)
 {
     mxUnhookTimerA();
-    mxTimerALock = 1;
+    bool ie = mxDisableTimerA();
     Jdisint(MFP_TIMERA);
     // todo: save all relevant mfp regs?
     mxTimerAOld = (uint32)Setexc(0x134>>2, -1);
@@ -41,19 +41,30 @@ uint32 mxHookTimerA(void(*func)(void), uint32 hz)
     uint32 real_hz = mfpParamsFromHz(hz, &ctrl, &data);
     Xbtimer(XB_TIMERA, ctrl, data, mxTimerAVec);
     Jenabint(MFP_TIMERA);
-    mxTimerALock = 0;
+    mxRestoreTimerA(ie);
     return real_hz;
 }
 
 void mxUnhookTimerA()
 {
     if (mxTimerAFunc != null) {
-        mxTimerALock = 1;
+        bool ie = mxDisableTimerA();
         Jdisint(MFP_TIMERA);
         (void)Setexc(0x134>>2, mxTimerAOld);
         mxTimerAFunc = 0;
         mxTimerAOld = 0;
+        mxRestoreTimerA(ie);
     }
+}
+
+bool mxDisableTimerA()
+{
+    return (mxTimerAVecLock() == 0) ? true : false;
+}
+
+void mxRestoreTimerA(bool enable)
+{
+    mxTimerALock = enable ? 0 : 1;
 }
 
 uint32 mxChangeTimerA(uint32 hz)
@@ -63,12 +74,12 @@ uint32 mxChangeTimerA(uint32 hz)
     // timer interrupt so special care would have to be taken.
     // Hades and Raven has MFP in the usual location but I am unsure about Milan
     // so we may need a special case for that machine here.
-    mxTimerALock = 1;
+    bool ie = mxDisableTimerA();
     uint16 ctrl, data;
     uint32 real_hz = mfpParamsFromHz(hz, &ctrl, &data);
     *((volatile unsigned char*)0xfffa19) = ctrl;
     *((volatile unsigned char*)0xfffa1f) = data;
-    mxTimerALock = 0;
+    mxRestoreTimerA(ie);
     return real_hz;
 }
 

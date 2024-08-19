@@ -9,6 +9,7 @@
     .global _mxTimerALock
     .global _mxTimerAOld
     .global _mxTimerAVec
+    .global _mxTimerAVecLock
     .global _mxTimerAFunc
 
 _mxTimerATicks:     dc.l 0
@@ -19,9 +20,8 @@ _mxTimerAXbra:      dc.l 0x58425241              // XBRA
 _mxTimerAOld:       dc.l 0
 _mxTimerAVec:
     addq.l  #1,_mxTimerATicks       // increase tick counter
-    tst.b   _mxTimerALock           // skip processing if locked
-    bne.s   .skipTimerA
-    move.b  #1,_mxTimerALock        // lock entry
+    bset    #0,_mxTimerALock        // lock interrupt
+    bne.s   .skipTimerA             // skip interrupt if already locked
     movem.l d0-d1/a0-a1,-(sp)       // save gcc regs
     move.w  16(sp),d0               // get old sr
     or.w    #0x2000,d0              // keep supervisor status
@@ -30,12 +30,20 @@ _mxTimerAVec:
     move.w  d0,sr                   // enable interrupts as they where
     jsr     (a0)                    // call timer function
     movem.l (sp)+,d0-d1/a0-a1       // restore gcc regs
-    clr.b   _mxTimerALock           // unlock entry
+    bclr    #0,_mxTimerALock        // unlock
     rte
 .skipTimerA:
+    bclr    #0,_mxTimerALock        // unlock interrupt
     move.b  #0xdf,0xfa0f.w          // clear timer-a in service
     rte
 
+_mxTimerAVecLock:
+    bset    #0,_mxTimerALock
+    bne.b   0f
+    moveq.l #0,d0
+    rts
+0:  moveq.l #1,d0
+    rts
 
 
 #if defined(DEBUG) && defined(PLUGIN_JAM)
