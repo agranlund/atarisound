@@ -6,9 +6,10 @@ CLEAN_ODIRS = 	ext \
 				ext/jam \
 				ext/stripx
 
-BUILD_MDIRS	=	ext/libcmini \
-				jamplugins
-
+BUILD_MDIRS = ext/libcmini \
+              plugins/midi \
+              plugins/mod \
+              plugins/opl
 
 .PHONY: all clean
 
